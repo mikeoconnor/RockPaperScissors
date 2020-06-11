@@ -165,6 +165,7 @@ contract RockPaperScissors is Stoppable {
      * @param _gameMove - The player's game move
      * @param secret - The secret used to generate the commitment.
      * @return true if successfull, false otherwise.
+     * Emits events: LogMoveReveal, LogGameWinner, LogGameDraw
      */
     function moveReveal(uint8 _gameMove, bytes32 secret)
         public
