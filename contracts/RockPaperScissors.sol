@@ -6,15 +6,18 @@ import "./Stoppable.sol";
  * @title RockPaperScissors
  *
  * Two players can play the rock paper and scissors game. First each player
- * commits to a move by calling function moveCommit(...) and paying a fee equal
- * to the required game deposit. Once each play has committed to a move, then
- * each player reveals the move by calling function moveReveal(...). Once each
- * player has successfully called moveReveal(...), then the contract determines
- * the result of the game and re-distributes the game funds (if required). The
- * wining player can withdraw their winning by calling function withdraw(). In
- * the event of a draw each player may successfully call withdraw(). Once all of
- * the winnings have been withdrawn the contract resets the game ready for two
- * new players.
+ * commits to a move by calling functions player1MoveCommit(...) and
+ * player2MoveCommit() paying a fee equal to the required game deposit. Once
+ * each play has committed to a move, then each player reveals the move by
+ * calling functions player1MoveReveal(...) and player2MoveReveal. Once each
+ * player has successfully revealed their move, then the contract determines
+ * the result of the game and re-distributes the game funds (if required).
+ * Players can withdraw their winnings by calling functions player1Withdraw()
+ * and player2Withdraw(). The winning player can withdraw the amount of twice
+ * the game deposit. The losing player cannot withdraw successfully and in the
+ * case of a draw each player can withdraw a sum equal to the game deposite.
+ * Once all of the winnings have been withdrawn the contract resets the game
+ * ready for two new players.
  */
 contract RockPaperScissors is Stoppable {
 
@@ -25,14 +28,17 @@ contract RockPaperScissors is Stoppable {
     // The value that each player has to pay to play the game.
     uint256 public gameDeposit;
 
-    struct PlayerDetailsStruct {
-        address player;
-        bytes32 commitment;
-        uint8 gameMove;
-        uint256 balance;
+    struct GameDetailsStruct {
+        address player1;
+        address player2;
+        bytes32 commitment1;
+        bytes32 commitment2;
+        uint8 gameMove1;
+        uint8 gameMove2;
+        mapping(address => uint256) balance;
     }
 
-    PlayerDetailsStruct[2] public players;
+    GameDetailsStruct public game;
 
     /**
      * @dev Check that a game move is valid.
@@ -114,41 +120,48 @@ contract RockPaperScissors is Stoppable {
 
     /**
      * @dev This function records the game move of the calling player as a
-     * commitment (cryptographic has of game move).
-     * Note: This function can only be called at most once by each player during
-     * the game.
-     * @param _commitment - Cryptographic has of player's move.
+     * commitment (cryptographic hash of game move).
+     * @param _commitment - Cryptographic hash of player's move.
      * @return true if successfull, false otherwise.
      * Emits event: LogMoveCommit.
      */
-    function moveCommit(bytes32 _commitment)
+    function player1MoveCommit(bytes32 _commitment)
         public
         payable
         ifAlive
         ifRunning
         returns (bool success)
     {
-        require(_commitment != 0);
+        require(_commitment != 0, "commitment should be non zero");
         require(msg.value == gameDeposit, "incorrect deposite to play game");
-        require(
-            (players[0].player == address(0) || players[1].player == address(0)),
-            "players already exists"
-        );
-        if(players[0].player == address(0)){
-            players[0].player = msg.sender;
-            players[0].commitment = _commitment;
-            players[0].balance = msg.value;
-        } else if (players[1].player == address(0)) {
-            require(
-                players[0].player != msg.sender,
-                "both players cannot be the same"
-            );
-            players[1].player = msg.sender;
-            players[1].commitment = _commitment;
-            players[1].balance = msg.value;
-        } else {
-            require(false, "unexpected players");
-        }
+        require(game.player1 == address(0), "player1 already exists");
+        game.player1 = msg.sender;
+        game.commitment1 = _commitment;
+        game.balance[msg.sender] = gameDeposit;
+        emit LogMoveCommit(msg.sender, _commitment, msg.value);
+        return true;
+    }
+
+    /**
+     * @dev This function records the game move of the calling player as a
+     * commitment (cryptographic hash of game move).
+     * @param _commitment - Cryptographic hash of player's move.
+     * @return true if successfull, false otherwise.
+     * Emits event: LogMoveCommit.
+     */
+    function player2MoveCommit(bytes32 _commitment)
+        public
+        payable
+        ifAlive
+        ifRunning
+        returns (bool success)
+    {
+        require(_commitment != 0, "commitment should be non zero");
+        require(msg.value == gameDeposit, "incorrect deposite to play game");
+        require(game.player2 == address(0), "player2 already exists");
+        game.player2 = msg.sender;
+        game.commitment2 = _commitment;
+        game.balance[msg.sender] = gameDeposit;
         emit LogMoveCommit(msg.sender, _commitment, msg.value);
         return true;
     }
@@ -157,64 +170,86 @@ contract RockPaperScissors is Stoppable {
      * @dev This function will reveal the calling player's game move. To do this
      * it verifies that the inputs to the function can generate the required
      * commitment.
-     * Note: This function can only be called after each player has successfully
-     * called function moveCommit(...).
-     * Note: After both players successfully call this functoin, it will
-     * determine the result of the game and distribute the funds to the players
-     * accordingly.
      * @param _gameMove - The player's game move
      * @param secret - The secret used to generate the commitment.
      * @return true if successfull, false otherwise.
      * Emits events: LogMoveReveal, LogGameWinner, LogGameDraw
      */
-    function moveReveal(uint8 _gameMove, bytes32 secret)
+    function player1MoveReveal(uint8 _gameMove, bytes32 secret)
         public
         ifAlive
         ifRunning
         moveIsValid(_gameMove)
         returns (bool success)
     {
-        require(
-            (players[0].player == msg.sender || players[1].player == msg.sender),
-            "incorrect player"
-        );
+        require(game.player1 == msg.sender, "incorrect player1");
         bytes32 revealCommitment = generateCommitment(_gameMove, secret);
-        require(
-            (players[0].commitment == revealCommitment
-            || players[1].commitment == revealCommitment),
-            "failed to verify commitment"
-        );
-        if (players[0].commitment == revealCommitment) {
-            require(players[0].gameMove == 0, "move already revealed");
-            players[0].gameMove = _gameMove;
-        } else if (players[1].commitment == revealCommitment) {
-            require(players[1].gameMove == 0, "move already revealed");
-            players[1].gameMove = _gameMove;
-        } else {
-            require(false, "unexpected game moves");
-        }
+        require(game.commitment1 == revealCommitment, "failed to verify commitment");
+        require(game.gameMove1 == 0, "move already revealed");
+        game.gameMove1 = _gameMove;
         emit LogMoveReveal(msg.sender, _gameMove);
-
-        // Both players have revealed, so determine the game winner
-        if (players[0].gameMove != 0 && players[1].gameMove != 0) {
-            uint8 idx = gameWinner(players[0].gameMove, players[1].gameMove);
-            if (idx == 0 || idx == 1) {
-                //players[idx.player] wins
-                players[idx].balance = 2 * gameDeposit;
-                players[(idx + 1) % 2].balance = 0;
-                emit LogGameWinner(players[idx].player, players[idx].balance);
-            } else if (idx == 2) {
-                // players draw
-                emit LogGameDraw(
-                    players[0].player,
-                    players[1].player,
-                    players[0].balance
-                );
-            } else {
-                require(false, "unxepected winner index");
-            }
+        if ((game.gameMove1 != 0) && (game.gameMove2 != 0)) {
+           determineGameResult();
         }
         return success;
+    }
+
+    /**
+     * @dev This function will reveal the calling player's game move. To do this
+     * it verifies that the inputs to the function can generate the required
+     * commitment.
+     * @param _gameMove - The player's game move
+     * @param secret - The secret used to generate the commitment.
+     * @return true if successfull, false otherwise.
+     * Emits events: LogMoveReveal, LogGameWinner, LogGameDraw
+     */
+    function player2MoveReveal(uint8 _gameMove, bytes32 secret)
+        public
+        ifAlive
+        ifRunning
+        moveIsValid(_gameMove)
+        returns (bool success)
+    {
+        require(game.player2 == msg.sender, "incorrect player2");
+        bytes32 revealCommitment = generateCommitment(_gameMove, secret);
+        require(game.commitment2 == revealCommitment, "failed to verify commitment");
+        require(game.gameMove2 == 0, "move already revealed");
+        game.gameMove2 = _gameMove;
+        emit LogMoveReveal(msg.sender, _gameMove);
+        if ((game.gameMove1 != 0) && (game.gameMove2 != 0 )) {
+           determineGameResult();
+        }
+        return success;
+    }
+
+    /**
+     * @dev This functions reveals the result of the game. That is was the
+     * game won or drawn. It re-distrubutes the players funds according to the
+     * outcome of the game.
+     * Emits events: LogGameWinner, LogGameDraw
+     */
+    function determineGameResult()
+        internal
+        moveIsValid(game.gameMove1)
+        moveIsValid(game.gameMove2)
+    {
+        uint8 idx = gameWinner(game.gameMove1, game.gameMove2);
+        if (idx == 0) {
+            // player1 wins the game
+            emit LogGameWinner(game.player1, 2 * gameDeposit);
+            game.balance[game.player1] = 2 * gameDeposit;
+            game.balance[game.player2] = 0;
+        } else if (idx == 1) {
+            // player2 wins the game
+            emit LogGameWinner(game.player2, 2 * gameDeposit);
+            game.balance[game.player2] = 2 * gameDeposit;
+            game.balance[game.player1] = 0;
+        } else if (idx == 2) {
+            // player1 and player2 draw the game
+            emit LogGameDraw(game.player1, game.player2, gameDeposit);
+        } else {
+            require(false, "unexpected winner index");
+        }
     }
 
     /**
@@ -251,42 +286,73 @@ contract RockPaperScissors is Stoppable {
     }
 
     /**
-     * @dev Withdraw players balance at the end of the game.
+     * @dev Withdraw player's balance at the end of the game.
      * Note: This function can only be called after each player has successfully
-     * called function moveReveal(...).
+     * revealed their move.
      * Note: This function will check that both players have no funds remaining
      * and if so, it will reset the game (ready for the next set of players).
      * @return true if successful, false otherwise.
      * Emits event: LogWithdraw.
      */
-    function withdraw()
+    function player1Withdraw()
         public
         ifAlive
         ifRunning
-        moveIsValid(players[0].gameMove)
-        moveIsValid(players[1].gameMove)
+        moveIsValid(game.gameMove1)
+        moveIsValid(game.gameMove2)
         returns (bool success)
     {
-        require(
-            (players[0].player == msg.sender || players[1].player == msg.sender),
-            "incorrect player"
-        );
-        uint8 idx = 2;
-        if (players[0].player == msg.sender) {
-            idx = 0;
-        } else if (players[1].player == msg.sender){
-            idx = 1;
-        } else {
-            require(false, "invalid index");
-        }
-        require(players[idx].balance > 0, "no funds");
-        uint256 amount = players[idx].balance;
-        players[idx].balance = 0;
+        require(game.player1 == msg.sender, "incorrect player1");
+        require(game.balance[game.player1] > 0, "no funds");
+        uint256 amount = game.balance[game.player1];
+        game.balance[game.player1] = 0;
         emit LogWithdraw(msg.sender, amount);
 
         // if all players balances are zero then reset state ready for a new game
-        if (players[0].balance == 0 && players[1].balance == 0) {
-            delete players;
+        if ((game.balance[game.player1] == 0) && (game.balance[game.player2] == 0)) {
+            game.player1 = address(0);
+            game.player2 = address(0);
+            game.gameMove1 = 0;
+            game.gameMove2 = 0;
+            game.commitment1 = 0;
+            game.commitment2 = 0;
+        }
+
+        (success, ) = msg.sender.call.value(amount)("");
+        require(success, "failed to transfer funds");
+    }
+
+    /**
+     * @dev Withdraw player's balance at the end of the game.
+     * Note: This function can only be called after each player has successfully
+     * revealed their move.
+     * Note: This function will check that both players have no funds remaining
+     * and if so, it will reset the game (ready for the next set of players).
+     * @return true if successful, false otherwise.
+     * Emits event: LogWithdraw.
+     */
+    function player2Withdraw()
+        public
+        ifAlive
+        ifRunning
+        moveIsValid(game.gameMove1)
+        moveIsValid(game.gameMove2)
+        returns (bool success)
+    {
+        require(game.player2 == msg.sender, "incorrect player2");
+        require(game.balance[game.player2] > 0, "no funds");
+        uint256 amount = game.balance[game.player2];
+        game.balance[game.player2] = 0;
+        emit LogWithdraw(msg.sender, amount);
+
+        // if all players balances are zero then reset state ready for a new game
+        if ((game.balance[game.player1] == 0) && (game.balance[game.player2] == 0)) {
+            game.player1 = address(0);
+            game.player2 = address(0);
+            game.gameMove1 = 0;
+            game.gameMove2 = 0;
+            game.commitment1 = 0;
+            game.commitment2 = 0;
         }
 
         (success, ) = msg.sender.call.value(amount)("");
