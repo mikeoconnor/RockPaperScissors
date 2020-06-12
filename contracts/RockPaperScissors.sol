@@ -21,9 +21,13 @@ import "./Stoppable.sol";
  */
 contract RockPaperScissors is Stoppable {
 
-    uint8 constant ROCK = 1;
-    uint8 constant PAPER = 2;
-    uint8 constant SCISSORS = 3;
+    // The allowed game moves
+    enum GameMoves {
+        None,
+        Rock,
+        Paper,
+        Scissors
+    }
 
     // The value that each player has to pay to play the game.
     uint256 public gameDeposit;
@@ -33,8 +37,8 @@ contract RockPaperScissors is Stoppable {
         address player2;
         bytes32 commitment1;
         bytes32 commitment2;
-        uint8 gameMove1;
-        uint8 gameMove2;
+        GameMoves gameMove1;
+        GameMoves gameMove2;
         mapping(address => uint256) balance;
     }
 
@@ -44,8 +48,8 @@ contract RockPaperScissors is Stoppable {
      * @dev Check that a game move is valid.
      * @param _move - the game move.
      */
-    modifier moveIsValid(uint8 _move) {
-        require(ROCK <= _move && _move <= SCISSORS, "invalid move");
+    modifier moveIsValid(GameMoves _move) {
+        require(GameMoves.Rock <= _move && _move <= GameMoves.Scissors, "invalid move");
         _;
     }
 
@@ -66,7 +70,7 @@ contract RockPaperScissors is Stoppable {
      * @param player - address of player revealing move.
      * @param gameMove - the revealed game move.
      */
-    event LogMoveReveal(address indexed player, uint8 gameMove);
+    event LogMoveReveal(address indexed player, GameMoves gameMove);
 
     /**
      * @dev Log that a play has won the game.
@@ -109,7 +113,7 @@ contract RockPaperScissors is Stoppable {
      * known by each player.
      * @return A commitment.
      */
-    function generateCommitment(uint8 _gameMove, bytes32 secret)
+    function generateCommitment(GameMoves _gameMove, bytes32 secret)
         public
         view
         moveIsValid(_gameMove)
@@ -175,7 +179,7 @@ contract RockPaperScissors is Stoppable {
      * @return true if successfull, false otherwise.
      * Emits events: LogMoveReveal, LogGameWinner, LogGameDraw
      */
-    function player1MoveReveal(uint8 _gameMove, bytes32 secret)
+    function player1MoveReveal(GameMoves _gameMove, bytes32 secret)
         public
         ifAlive
         ifRunning
@@ -185,10 +189,10 @@ contract RockPaperScissors is Stoppable {
         require(game.player1 == msg.sender, "incorrect player1");
         bytes32 revealCommitment = generateCommitment(_gameMove, secret);
         require(game.commitment1 == revealCommitment, "failed to verify commitment");
-        require(game.gameMove1 == 0, "move already revealed");
+        require(game.gameMove1 == GameMoves.None, "move already revealed");
         game.gameMove1 = _gameMove;
         emit LogMoveReveal(msg.sender, _gameMove);
-        if ((game.gameMove1 != 0) && (game.gameMove2 != 0)) {
+        if ((game.gameMove1 != GameMoves.None) && (game.gameMove2 != GameMoves.None)) {
            determineGameResult();
         }
         return success;
@@ -203,7 +207,7 @@ contract RockPaperScissors is Stoppable {
      * @return true if successfull, false otherwise.
      * Emits events: LogMoveReveal, LogGameWinner, LogGameDraw
      */
-    function player2MoveReveal(uint8 _gameMove, bytes32 secret)
+    function player2MoveReveal(GameMoves _gameMove, bytes32 secret)
         public
         ifAlive
         ifRunning
@@ -213,10 +217,10 @@ contract RockPaperScissors is Stoppable {
         require(game.player2 == msg.sender, "incorrect player2");
         bytes32 revealCommitment = generateCommitment(_gameMove, secret);
         require(game.commitment2 == revealCommitment, "failed to verify commitment");
-        require(game.gameMove2 == 0, "move already revealed");
+        require(game.gameMove2 == GameMoves.None, "move already revealed");
         game.gameMove2 = _gameMove;
         emit LogMoveReveal(msg.sender, _gameMove);
-        if ((game.gameMove1 != 0) && (game.gameMove2 != 0 )) {
+        if ((game.gameMove1 != GameMoves.None) && (game.gameMove2 != GameMoves.None)) {
            determineGameResult();
         }
         return success;
@@ -259,7 +263,7 @@ contract RockPaperScissors is Stoppable {
      * @return The index of the winning player (0 or 1) if there was a winner,
      * otherwise return 2 if game was drawn.
      */
-    function gameWinner(uint8 gameMove0, uint8 gameMove1)
+    function gameWinner(GameMoves gameMove0, GameMoves gameMove1)
         internal
         pure
         moveIsValid(gameMove0)
@@ -269,15 +273,15 @@ contract RockPaperScissors is Stoppable {
         if (gameMove0 == gameMove1) {
             index = 2;
         } else if (
-            (gameMove0 == ROCK && gameMove1 == SCISSORS)
-            || (gameMove0 == PAPER && gameMove1 == ROCK)
-            || (gameMove0 == SCISSORS && gameMove1 == PAPER)
+            (gameMove0 == GameMoves.Rock && gameMove1 == GameMoves.Scissors)
+            || (gameMove0 == GameMoves.Paper && gameMove1 == GameMoves.Rock)
+            || (gameMove0 == GameMoves.Scissors && gameMove1 == GameMoves.Paper)
         ) {
             index = 0;
         } else if (
-            (gameMove0 == ROCK && gameMove1 == PAPER)
-            || (gameMove0 == PAPER && gameMove1 == SCISSORS)
-            || (gameMove0 == SCISSORS && gameMove1 == ROCK)
+            (gameMove0 == GameMoves.Rock && gameMove1 == GameMoves.Paper)
+            || (gameMove0 == GameMoves.Paper && gameMove1 == GameMoves.Scissors)
+            || (gameMove0 == GameMoves.Scissors && gameMove1 == GameMoves.Rock)
         ) {
             index = 1;
         } else {
@@ -312,8 +316,8 @@ contract RockPaperScissors is Stoppable {
         if ((game.balance[game.player1] == 0) && (game.balance[game.player2] == 0)) {
             game.player1 = address(0);
             game.player2 = address(0);
-            game.gameMove1 = 0;
-            game.gameMove2 = 0;
+            game.gameMove1 = GameMoves(0);
+            game.gameMove2 = GameMoves(0);
             game.commitment1 = 0;
             game.commitment2 = 0;
         }
@@ -349,8 +353,8 @@ contract RockPaperScissors is Stoppable {
         if ((game.balance[game.player1] == 0) && (game.balance[game.player2] == 0)) {
             game.player1 = address(0);
             game.player2 = address(0);
-            game.gameMove1 = 0;
-            game.gameMove2 = 0;
+            game.gameMove1 = GameMoves(0);
+            game.gameMove2 = GameMoves(0);
             game.commitment1 = 0;
             game.commitment2 = 0;
         }
