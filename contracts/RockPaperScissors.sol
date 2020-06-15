@@ -5,13 +5,15 @@ import "./Stoppable.sol";
 /**
  * @title RockPaperScissors
  *
- * Two players can play the rock paper and scissors game. First each player
- * commits to a move by calling functions player1MoveCommit(...) and
- * player2MoveCommit() paying a fee equal to the required game deposit. Once
- * each play has committed to a move, then each player reveals the move by
- * calling functions player1MoveReveal(...) and player2MoveReveal. Once each
- * player has successfully revealed their move, then the contract determines
- * the result of the game and re-distributes the game funds (if required).
+ * Two players can play the rock paper and scissors game. First player1
+ * commits to a move by calling functions player1MoveCommit(...) and also
+ * sets the amount of wei's to play the game.
+ * Player2 then commits to a move by calling player2MoveCommit(...) and paying
+ * a fee equal to the required game deposit. Once each play has committed to a
+ * move, then each player reveals the move by calling functions
+ * player1MoveReveal(...) and player2MoveReveal. Once each player has
+ * successfully revealed their move, then the contract determines the result
+ * of the game and re-distributes the game funds (if required).
  * Players can withdraw their winnings by calling functions player1Withdraw()
  * and player2Withdraw(). The winning player can withdraw the amount of twice
  * the game deposit. The losing player cannot withdraw successfully and in the
@@ -29,9 +31,6 @@ contract RockPaperScissors is Stoppable {
         Scissors
     }
 
-    // The value that each player has to pay to play the game.
-    uint256 public gameDeposit;
-
     struct GameDetailsStruct {
         address player1;
         address player2;
@@ -39,6 +38,7 @@ contract RockPaperScissors is Stoppable {
         bytes32 commitment2;
         GameMoves gameMove1;
         GameMoves gameMove2;
+        uint256 gameDeposit;
     }
 
     mapping(address => uint256) balance;
@@ -100,14 +100,6 @@ contract RockPaperScissors is Stoppable {
     event LogWithdraw(address indexed sender, uint256 amount);
 
     /**
-     * @dev Constructor.
-     * @param _gameDeposit - the value in wei required by players to play.
-     */
-    constructor(uint256 _gameDeposit) public {
-        gameDeposit = _gameDeposit;
-    }
-
-    /**
      * @dev Generate a commitment (crytographic hash of game move).
      * @param _gameMove - the game move.
      * @param secret - secert phrase that is unique to each player and only
@@ -124,8 +116,10 @@ contract RockPaperScissors is Stoppable {
     }
 
     /**
-     * @dev This function records the game move of the calling player as a
-     * commitment (cryptographic hash of game move).
+     * @dev This function records the game move of the first player (player1)
+     * as a commitment (cryptographic hash of game move). Player1 also
+     * determines the game deposite (the funds that player2 will have to
+     * deposit to play the game).
      * @param _commitment - Cryptographic hash of player's move.
      * @return true if successfull, false otherwise.
      * Emits event: LogMoveCommit.
@@ -138,18 +132,21 @@ contract RockPaperScissors is Stoppable {
         returns (bool success)
     {
         require(_commitment != 0, "commitment should be non zero");
-        require(msg.value == gameDeposit, "incorrect deposite to play game");
+        require(msg.value != 0, "a game deposit is required");
         require(game.player1 == address(0), "player1 already exists");
         game.player1 = msg.sender;
         game.commitment1 = _commitment;
-        balance[msg.sender] = gameDeposit;
+        game.gameDeposit = msg.value;
+        balance[msg.sender] = game.gameDeposit;
         emit LogMoveCommit(msg.sender, _commitment, msg.value);
         return true;
     }
 
     /**
-     * @dev This function records the game move of the calling player as a
-     * commitment (cryptographic hash of game move).
+     * @dev This function records the game move of the second player (player2)
+     * as a commitment (cryptographic hash of game move). This function can
+     * only be called after player1MoveCommit and player2 has to match the
+     * funds deposited by player1 in order to play.
      * @param _commitment - Cryptographic hash of player's move.
      * @return true if successfull, false otherwise.
      * Emits event: LogMoveCommit.
@@ -162,11 +159,12 @@ contract RockPaperScissors is Stoppable {
         returns (bool success)
     {
         require(_commitment != 0, "commitment should be non zero");
-        require(msg.value == gameDeposit, "incorrect deposite to play game");
+        require(game.gameDeposit > 0, "game deposit not set");
+        require(msg.value == game.gameDeposit, "incorrect deposite to play game");
         require(game.player2 == address(0), "player2 already exists");
         game.player2 = msg.sender;
         game.commitment2 = _commitment;
-        balance[msg.sender] = gameDeposit;
+        balance[msg.sender] = game.gameDeposit;
         emit LogMoveCommit(msg.sender, _commitment, msg.value);
         return true;
     }
@@ -241,17 +239,17 @@ contract RockPaperScissors is Stoppable {
         uint8 idx = gameWinner(game.gameMove1, game.gameMove2);
         if (idx == 0) {
             // player1 wins the game
-            emit LogGameWinner(game.player1, 2 * gameDeposit);
-            balance[game.player1] = 2 * gameDeposit;
+            emit LogGameWinner(game.player1, 2 * game.gameDeposit);
+            balance[game.player1] = 2 * game.gameDeposit;
             balance[game.player2] = 0;
         } else if (idx == 1) {
             // player2 wins the game
-            emit LogGameWinner(game.player2, 2 * gameDeposit);
-            balance[game.player2] = 2 * gameDeposit;
+            emit LogGameWinner(game.player2, 2 * game.gameDeposit);
+            balance[game.player2] = 2 * game.gameDeposit;
             balance[game.player1] = 0;
         } else if (idx == 2) {
             // player1 and player2 draw the game
-            emit LogGameDraw(game.player1, game.player2, gameDeposit);
+            emit LogGameDraw(game.player1, game.player2, game.gameDeposit);
         } else {
             require(false, "unexpected winner index");
         }
