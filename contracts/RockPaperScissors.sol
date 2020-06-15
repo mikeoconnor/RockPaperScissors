@@ -39,8 +39,9 @@ contract RockPaperScissors is Stoppable {
         bytes32 commitment2;
         GameMoves gameMove1;
         GameMoves gameMove2;
-        mapping(address => uint256) balance;
     }
+
+    mapping(address => uint256) balance;
 
     GameDetailsStruct public game;
 
@@ -141,7 +142,7 @@ contract RockPaperScissors is Stoppable {
         require(game.player1 == address(0), "player1 already exists");
         game.player1 = msg.sender;
         game.commitment1 = _commitment;
-        game.balance[msg.sender] = gameDeposit;
+        balance[msg.sender] = gameDeposit;
         emit LogMoveCommit(msg.sender, _commitment, msg.value);
         return true;
     }
@@ -165,7 +166,7 @@ contract RockPaperScissors is Stoppable {
         require(game.player2 == address(0), "player2 already exists");
         game.player2 = msg.sender;
         game.commitment2 = _commitment;
-        game.balance[msg.sender] = gameDeposit;
+        balance[msg.sender] = gameDeposit;
         emit LogMoveCommit(msg.sender, _commitment, msg.value);
         return true;
     }
@@ -241,13 +242,13 @@ contract RockPaperScissors is Stoppable {
         if (idx == 0) {
             // player1 wins the game
             emit LogGameWinner(game.player1, 2 * gameDeposit);
-            game.balance[game.player1] = 2 * gameDeposit;
-            game.balance[game.player2] = 0;
+            balance[game.player1] = 2 * gameDeposit;
+            balance[game.player2] = 0;
         } else if (idx == 1) {
             // player2 wins the game
             emit LogGameWinner(game.player2, 2 * gameDeposit);
-            game.balance[game.player2] = 2 * gameDeposit;
-            game.balance[game.player1] = 0;
+            balance[game.player2] = 2 * gameDeposit;
+            balance[game.player1] = 0;
         } else if (idx == 2) {
             // player1 and player2 draw the game
             emit LogGameDraw(game.player1, game.player2, gameDeposit);
@@ -307,13 +308,13 @@ contract RockPaperScissors is Stoppable {
         returns (bool success)
     {
         require(game.player1 == msg.sender, "incorrect player1");
-        require(game.balance[game.player1] > 0, "no funds");
-        uint256 amount = game.balance[game.player1];
-        game.balance[game.player1] = 0;
+        require(balance[game.player1] > 0, "no funds");
+        uint256 amount = balance[game.player1];
+        balance[game.player1] = 0;
         emit LogWithdraw(msg.sender, amount);
 
         // if all players balances are zero then reset state ready for a new game
-        if ((game.balance[game.player1] == 0) && (game.balance[game.player2] == 0)) {
+        if ((balance[game.player1] == 0) && (balance[game.player2] == 0)) {
             game.player1 = address(0);
             game.player2 = address(0);
             game.gameMove1 = GameMoves(0);
@@ -344,13 +345,13 @@ contract RockPaperScissors is Stoppable {
         returns (bool success)
     {
         require(game.player2 == msg.sender, "incorrect player2");
-        require(game.balance[game.player2] > 0, "no funds");
-        uint256 amount = game.balance[game.player2];
-        game.balance[game.player2] = 0;
+        require(balance[game.player2] > 0, "no funds");
+        uint256 amount = balance[game.player2];
+        balance[game.player2] = 0;
         emit LogWithdraw(msg.sender, amount);
 
         // if all players balances are zero then reset state ready for a new game
-        if ((game.balance[game.player1] == 0) && (game.balance[game.player2] == 0)) {
+        if ((balance[game.player1] == 0) && (balance[game.player2] == 0)) {
             game.player1 = address(0);
             game.player2 = address(0);
             game.gameMove1 = GameMoves(0);
