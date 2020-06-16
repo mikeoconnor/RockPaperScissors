@@ -18,6 +18,9 @@ import "./Stoppable.sol";
  * case of a draw each player can withdraw a sum equal to the game deposite.
  * Once all of the winnings have been withdrawn the contract resets the game
  * ready for two new players.
+ * Note: If player2 fails to make a move in a specified period then player1
+ * may cancel the game and reclaim their funds by calling function
+ * player1ReclaimFunds
  */
 contract RockPaperScissors is Stoppable {
 
@@ -36,11 +39,15 @@ contract RockPaperScissors is Stoppable {
         GameMoves gameMove1;
         GameMoves gameMove2;
         uint256 gameDeposit;
+        uint256 moveExpiration;
     }
 
     mapping(address => uint256) balance;
 
     GameDetailsStruct public game;
+
+    // Wait for a period of 10 mins
+    uint256 public constant WAITPERIOD = 600;
 
     /**
      * @dev Check that a game move is valid.
@@ -109,6 +116,15 @@ contract RockPaperScissors is Stoppable {
     event LogWithdraw(address indexed sender, uint256 amount);
 
     /**
+     * @dev Log that a first player (player1) has cancelled the game and
+     * withdrawn their funds, because the second player (player2) has not made
+     * a move within the required time period.
+     * @param player - address of player.
+     * @param amount - the amount of wei withdrawn.
+     */
+    event LogPlayer1ReclaimFunds(address indexed player, uint256 amount);
+
+    /**
      * @dev Generate a commitment (crytographic hash of game move).
      * @param _gameMove - the game move.
      * @param secret - secert phrase that is unique to each player and only
@@ -147,6 +163,7 @@ contract RockPaperScissors is Stoppable {
         game.commitment1 = _commitment;
         game.gameDeposit = msg.value;
         balance[msg.sender] = game.gameDeposit;
+        game.moveExpiration = now + WAITPERIOD;
         emit LogMoveCommitPlayer1(msg.sender, _commitment, msg.value);
         return true;
     }
@@ -299,6 +316,7 @@ contract RockPaperScissors is Stoppable {
             game.gameMove2 = GameMoves(0);
             game.commitment1 = 0;
             game.gameDeposit = 0;
+            game.moveExpiration = 0;
         }
 
         (success, ) = msg.sender.call.value(amount)("");
@@ -336,8 +354,36 @@ contract RockPaperScissors is Stoppable {
             game.gameMove2 = GameMoves(0);
             game.commitment1 = 0;
             game.gameDeposit = 0;
+            game.moveExpiration = 0;
         }
 
+        (success, ) = msg.sender.call.value(amount)("");
+        require(success, "failed to transfer funds");
+    }
+
+    /**
+     * @dev This function allows the first player (player1) to cancel the game
+     * and reclaim their funds, when the second player (player2) has not made
+     * their move within the required time period.
+     * @return true if successful, false otherwise.
+     * Emits event: LogPlayer1ReclaimFunds.
+     */
+    function player1ReclaimFunds()
+        public
+        ifAlive
+        ifRunning
+        returns (bool success)
+    {
+        require(game.player1 == msg.sender, "incorrect player");
+        require(game.player2 == address(0), "player2 has made a move");
+        require(now > game.moveExpiration, "game move not yet expired");
+        uint256 amount = balance[game.player1];
+        balance[game.player1] = 0;
+        game.player1 = address(0);
+        game.commitment1 = 0;
+        game.gameDeposit = 0;
+        game.moveExpiration = 0;
+        emit LogPlayer1ReclaimFunds(msg.sender, amount);
         (success, ) = msg.sender.call.value(amount)("");
         require(success, "failed to transfer funds");
     }
