@@ -149,6 +149,89 @@ contract('RockPaperScissors - Given game where alice has commited to a move', (a
 });
 
 contract(
+    'RockPaperScissors - Given game where alice has commited to a move and then bob has made a move',
+    (accounts) => {
+    const owner = accounts[0];
+    const alice = accounts[4];
+    const bob = accounts[5];
+    const GameDeposit = web3.utils.toWei('5', 'finney');
+    const secretAlice = web3.utils.utf8ToHex("secretForAlice");
+
+    beforeEach('set up contract and moves', async() => {
+        instance = await RockPaperScissors.new({from: owner});
+        let commitment = await instance.generateCommitment(ROCK, secretAlice);
+        await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
+        await instance.player2Move(PAPER, {from: bob, value: GameDeposit});
+    });
+
+    it('should not allow bob to claim funds before reveal expiration', async() => {
+        await truffleAssert.reverts(
+            instance.player2ClaimFunds({from: bob}),
+            "game reveal not yet expired"
+        );
+    });
+
+    it('should not allow bob to make move', async() => {
+        await truffleAssert.reverts(
+            instance.player2Move(PAPER, {from: bob, value: GameDeposit}),
+            "player2 already exists"
+        );
+    });
+
+    it('should not allow alice to make commitment to a move', async() => {
+        let commitment = await instance.generateCommitment(ROCK, secretAlice);
+        await truffleAssert.reverts(
+            instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit}),
+            "player1 already exists"
+        );
+    });
+});
+
+contract(
+    'RockPaperScissors - Given game where alice has commited to a move and then bob has made a move',
+    (accounts) => {
+    const owner = accounts[0];
+    const alice = accounts[4];
+    const bob = accounts[5];
+    const GameDeposit = web3.utils.toWei('5', 'finney');
+    const secretAlice = web3.utils.utf8ToHex("secretForAlice");
+
+    before('set up contract and moves', async () => {
+        instance = await RockPaperScissors.new({from: owner});
+        let commitment = await instance.generateCommitment(ROCK, secretAlice);
+        await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
+        await instance.player2Move(PAPER, {from: bob, value: GameDeposit});
+        let snapshot = await tm.takeSnapshot();
+        snapshotId = snapshot.result;
+    });
+
+    after(async() => {
+        await tm.revertToSnapshot(snapshotId);
+    });
+
+    it('should allow bob to claim the funds after reveal expiration period', async() => {
+        let SKIP_FORWARD_PERIOD = 15 * 60; //15 mins
+        await tm.advanceTimeAndBlock(SKIP_FORWARD_PERIOD);
+        tx = await instance.player2ClaimFunds({from: bob});
+        truffleAssert.eventEmitted(tx, 'LogPlayer2ClaimFunds', evt => {
+            return evt.player === bob
+                && evt.amount.toString(10) === (GameDeposit*2).toString(10);
+        });
+
+        // Assert that game has been reset
+        let game = await instance.game();
+        assert.equal(game.player1, 0);
+        assert.equal(game.player2, 0);
+        assert.equal(game.gameMove1.toString(10), '0');
+        assert.equal(game.gameMove2.toString(10), '0');
+        assert.equal(game.commitment1, 0);
+        assert.equal(game.gameDeposit, 0);
+        assert.equal(game.moveExpiration, 0);
+        assert.equal(game.revealExpiration, 0);
+    });
+});
+
+contract(
     'RockPaperScissors - Given game where alice has commited to a move and bob has made a different (winning) move',
     (accounts) => {
     const owner = accounts[0];
@@ -209,6 +292,7 @@ contract(
         assert.equal(game.commitment1, 0);
         assert.equal(game.gameDeposit, 0);
         assert.equal(game.moveExpiration, 0);
+        assert.equal(game.revealExpiration, 0);
     });
 });
 
@@ -273,5 +357,6 @@ contract(
         assert.equal(game.commitment1, 0);
         assert.equal(game.gameDeposit, 0);
         assert.equal(game.moveExpiration, 0);
+        assert.equal(game.revealExpiration, 0);
     });
 });
