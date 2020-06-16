@@ -8,11 +8,9 @@ import "./Stoppable.sol";
  * Two players can play the rock paper and scissors game. First player1
  * commits to a move by calling functions player1MoveCommit(...) and also
  * sets the amount of wei's to play the game.
- * Player2 then commits to a move by calling player2MoveCommit(...) and paying
- * a fee equal to the required game deposit. Once each play has committed to a
- * move, then each player reveals the move by calling functions
- * player1MoveReveal(...) and player2MoveReveal. Once each player has
- * successfully revealed their move, then the contract determines the result
+ * Player2 then makes a move by calling player2Move(...) and paying a fee
+ * equal to the required game deposit. Player1 then reveals their move by
+ * calling player1MoveReveal(...). The contract then determines the result
  * of the game and re-distributes the game funds (if required).
  * Players can withdraw their winnings by calling functions player1Withdraw()
  * and player2Withdraw(). The winning player can withdraw the amount of twice
@@ -35,7 +33,6 @@ contract RockPaperScissors is Stoppable {
         address player1;
         address player2;
         bytes32 commitment1;
-        bytes32 commitment2;
         GameMoves gameMove1;
         GameMoves gameMove2;
         uint256 gameDeposit;
@@ -55,14 +52,26 @@ contract RockPaperScissors is Stoppable {
     }
 
     /**
-     * @dev Log that a player has commited to a move.
+     * @dev Log that first player (player1) has commited to a move.
      * @param player - address of player commiting move.
      * @param commitment - cryptographic hash of committed move.
      * @param bet - the amount of wei player spent to play move.
      */
-    event LogMoveCommit(
+    event LogMoveCommitPlayer1(
         address indexed player,
         bytes32 indexed commitment,
+        uint256 bet
+    );
+
+    /**
+     * @dev Log that second player (player2) has made a move.
+     * @param player - address of player making move.
+     * @param gameMove - the game move.
+     * @param bet - the amount of wei player spent to play move.
+     */
+    event LogMovePlayer2(
+        address indexed player,
+        GameMoves gameMove,
         uint256 bet
     );
 
@@ -122,7 +131,7 @@ contract RockPaperScissors is Stoppable {
      * deposit to play the game).
      * @param _commitment - Cryptographic hash of player's move.
      * @return true if successfull, false otherwise.
-     * Emits event: LogMoveCommit.
+     * Emits event: LogMoveCommitPlayer1.
      */
     function player1MoveCommit(bytes32 _commitment)
         public
@@ -138,34 +147,33 @@ contract RockPaperScissors is Stoppable {
         game.commitment1 = _commitment;
         game.gameDeposit = msg.value;
         balance[msg.sender] = game.gameDeposit;
-        emit LogMoveCommit(msg.sender, _commitment, msg.value);
+        emit LogMoveCommitPlayer1(msg.sender, _commitment, msg.value);
         return true;
     }
 
     /**
-     * @dev This function records the game move of the second player (player2)
-     * as a commitment (cryptographic hash of game move). This function can
-     * only be called after player1MoveCommit and player2 has to match the
-     * funds deposited by player1 in order to play.
-     * @param _commitment - Cryptographic hash of player's move.
+     * @dev This function records the game move of the second player (player2).
+     * This function can only be called after player1MoveCommit and player2
+     * has to match the funds deposited by player1 in order to play.
+     * @param _gameMove - the move made by player2.
      * @return true if successfull, false otherwise.
-     * Emits event: LogMoveCommit.
+     * Emits event: LogMovePlayer2.
      */
-    function player2MoveCommit(bytes32 _commitment)
+    function player2Move(GameMoves _gameMove)
         public
         payable
         ifAlive
         ifRunning
+        moveIsValid(_gameMove)
         returns (bool success)
     {
-        require(_commitment != 0, "commitment should be non zero");
         require(game.gameDeposit > 0, "game deposit not set");
         require(msg.value == game.gameDeposit, "incorrect deposite to play game");
         require(game.player2 == address(0), "player2 already exists");
         game.player2 = msg.sender;
-        game.commitment2 = _commitment;
+        game.gameMove2 = _gameMove;
         balance[msg.sender] = game.gameDeposit;
-        emit LogMoveCommit(msg.sender, _commitment, msg.value);
+        emit LogMovePlayer2(msg.sender, _gameMove, msg.value);
         return true;
     }
 
@@ -190,34 +198,6 @@ contract RockPaperScissors is Stoppable {
         require(game.commitment1 == revealCommitment, "failed to verify commitment");
         require(game.gameMove1 == GameMoves.None, "move already revealed");
         game.gameMove1 = _gameMove;
-        emit LogMoveReveal(msg.sender, _gameMove);
-        if ((game.gameMove1 != GameMoves.None) && (game.gameMove2 != GameMoves.None)) {
-           determineGameResult();
-        }
-        return success;
-    }
-
-    /**
-     * @dev This function will reveal the calling player's game move. To do this
-     * it verifies that the inputs to the function can generate the required
-     * commitment.
-     * @param _gameMove - The player's game move
-     * @param secret - The secret used to generate the commitment.
-     * @return true if successfull, false otherwise.
-     * Emits events: LogMoveReveal, LogGameWinner, LogGameDraw
-     */
-    function player2MoveReveal(GameMoves _gameMove, bytes32 secret)
-        public
-        ifAlive
-        ifRunning
-        moveIsValid(_gameMove)
-        returns (bool success)
-    {
-        require(game.player2 == msg.sender, "incorrect player2");
-        bytes32 revealCommitment = generateCommitment(_gameMove, secret);
-        require(game.commitment2 == revealCommitment, "failed to verify commitment");
-        require(game.gameMove2 == GameMoves.None, "move already revealed");
-        game.gameMove2 = _gameMove;
         emit LogMoveReveal(msg.sender, _gameMove);
         if ((game.gameMove1 != GameMoves.None) && (game.gameMove2 != GameMoves.None)) {
            determineGameResult();
@@ -318,7 +298,7 @@ contract RockPaperScissors is Stoppable {
             game.gameMove1 = GameMoves(0);
             game.gameMove2 = GameMoves(0);
             game.commitment1 = 0;
-            game.commitment2 = 0;
+            game.gameDeposit = 0;
         }
 
         (success, ) = msg.sender.call.value(amount)("");
@@ -355,7 +335,7 @@ contract RockPaperScissors is Stoppable {
             game.gameMove1 = GameMoves(0);
             game.gameMove2 = GameMoves(0);
             game.commitment1 = 0;
-            game.commitment2 = 0;
+            game.gameDeposit = 0;
         }
 
         (success, ) = msg.sender.call.value(amount)("");
