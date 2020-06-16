@@ -1,5 +1,6 @@
 const RockPaperScissors = artifacts.require("RockPaperScissors");
 const truffleAssert = require('truffle-assertions');
+const tm = require('ganache-time-traveler');
 
 let instance = null;
 let tx = null;
@@ -28,6 +29,8 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
         });
         let game = await instance.game();
         assert.equal(game.gameMove1.toString(10), '0');
+        let waitPeriod = await instance.WAITPERIOD();
+        assert.equal(waitPeriod.toString(10), '600');
     });
     
     it('should not allow bob (player2) to make a move', async() => {
@@ -69,6 +72,78 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
         await truffleAssert.reverts(
             instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit}),
             "player1 already exists"
+        );
+    });
+});
+
+contract('RockPaperScissors - Given game where alice has commited to a move', (accounts) => {
+    const owner = accounts[0];
+    const alice = accounts[4];
+    const bob = accounts[5];
+    const GameDeposit = web3.utils.toWei('5', 'finney');
+    const secretAlice = web3.utils.utf8ToHex("secretForAlice");
+
+    beforeEach('set up contract and alice commit to a move', async () => {
+        instance = await RockPaperScissors.new({from: owner});
+        let commitment = await instance.generateCommitment(ROCK, secretAlice);
+        await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
+    });
+
+    it('should allow bob to make a move, but not two moves', async() => {
+        tx = await instance.player2Move(PAPER, {from: bob, value: GameDeposit});
+        truffleAssert.eventEmitted(tx, 'LogMovePlayer2', evt => {
+            return evt.player === bob
+                && evt.gameMove.toString(10) === PAPER.toString(10)
+                && evt.bet.toString(10) === GameDeposit.toString(10);
+        });
+        await truffleAssert.reverts(
+            instance.player2Move(PAPER, {from: bob, value: GameDeposit}),
+            "player2 already exists"
+        );
+    });
+
+    it('should not allow alice to reclaim funds before expiration period', async() => {
+        await truffleAssert.reverts(
+            instance.player1ReclaimFunds({from: alice}),
+            "game move not yet expired"
+        );
+    });
+
+});
+
+contract('RockPaperScissors - Given game where alice has commited to a move', (accounts) => {
+    const owner = accounts[0];
+    const alice = accounts[4];
+    const bob = accounts[5];
+    const GameDeposit = web3.utils.toWei('5', 'finney');
+    const secretAlice = web3.utils.utf8ToHex("secretForAlice");
+
+    before('set up contract and alice commit to a move', async () => {
+        instance = await RockPaperScissors.new({from: owner});
+        let commitment = await instance.generateCommitment(ROCK, secretAlice);
+        await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
+        let snapshot = await tm.takeSnapshot();
+        snapshotId = snapshot.result;
+    });
+
+    after(async() => {
+        await tm.revertToSnapshot(snapshotId);
+    });
+
+    it('should allow alice to reclaim funds after move expiration period', async() => {
+        let SKIP_FORWARD_PERIOD = 15 * 60; //15 mins
+        await tm.advanceTimeAndBlock(SKIP_FORWARD_PERIOD);
+        tx = await instance.player1ReclaimFunds({from: alice});
+        truffleAssert.eventEmitted(tx, 'LogPlayer1ReclaimFunds', evt => {
+            return evt.player === alice
+                && evt.amount.toString(10) === GameDeposit.toString(10);
+        });
+    });
+
+    it('should then not allow bob to make a move', async() => {
+        await truffleAssert.reverts(
+            instance.player2Move(PAPER, {from: bob, value: GameDeposit}),
+            "game deposit not set"
         );
     });
 });
@@ -133,6 +208,7 @@ contract(
         assert.equal(game.gameMove2.toString(10), '0');
         assert.equal(game.commitment1, 0);
         assert.equal(game.gameDeposit, 0);
+        assert.equal(game.moveExpiration, 0);
     });
 });
 
@@ -196,5 +272,6 @@ contract(
         assert.equal(game.gameMove2.toString(10), '0');
         assert.equal(game.commitment1, 0);
         assert.equal(game.gameDeposit, 0);
+        assert.equal(game.moveExpiration, 0);
     });
 });
