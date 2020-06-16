@@ -20,7 +20,10 @@ import "./Stoppable.sol";
  * ready for two new players.
  * Note: If player2 fails to make a move in a specified period then player1
  * may cancel the game and reclaim their funds by calling function
- * player1ReclaimFunds
+ * player1ReclaimFunds.
+ * Note: If player1 fails to reveal their game move in a specified period then
+ * player2 may claim all of the funds in the game by calling function
+ * player2ClaimFunds.
  */
 contract RockPaperScissors is Stoppable {
 
@@ -40,6 +43,7 @@ contract RockPaperScissors is Stoppable {
         GameMoves gameMove2;
         uint256 gameDeposit;
         uint256 moveExpiration;
+        uint256 revealExpiration;
     }
 
     mapping(address => uint256) balance;
@@ -125,6 +129,15 @@ contract RockPaperScissors is Stoppable {
     event LogPlayer1ReclaimFunds(address indexed player, uint256 amount);
 
     /**
+     * @dev Log that a second player (player2) has cancelled the game and
+     * withdrawn all of the funds, because the first player (player1) has not
+     * made a revealed their move within the required time period.
+     * @param player - address of player.
+     * @param amount - the amount of wei withdrawn.
+     */
+    event LogPlayer2ClaimFunds(address indexed player, uint256 amount);
+
+    /**
      * @dev Generate a commitment (crytographic hash of game move).
      * @param _gameMove - the game move.
      * @param secret - secert phrase that is unique to each player and only
@@ -190,6 +203,7 @@ contract RockPaperScissors is Stoppable {
         game.player2 = msg.sender;
         game.gameMove2 = _gameMove;
         balance[msg.sender] = game.gameDeposit;
+        game.revealExpiration = now + WAITPERIOD;
         emit LogMovePlayer2(msg.sender, _gameMove, msg.value);
         return true;
     }
@@ -317,6 +331,7 @@ contract RockPaperScissors is Stoppable {
             game.commitment1 = 0;
             game.gameDeposit = 0;
             game.moveExpiration = 0;
+            game.revealExpiration = 0;
         }
 
         (success, ) = msg.sender.call.value(amount)("");
@@ -355,6 +370,7 @@ contract RockPaperScissors is Stoppable {
             game.commitment1 = 0;
             game.gameDeposit = 0;
             game.moveExpiration = 0;
+            game.revealExpiration = 0;
         }
 
         (success, ) = msg.sender.call.value(amount)("");
@@ -379,6 +395,8 @@ contract RockPaperScissors is Stoppable {
         require(now > game.moveExpiration, "game move not yet expired");
         uint256 amount = balance[game.player1];
         balance[game.player1] = 0;
+
+        //reset game
         game.player1 = address(0);
         game.commitment1 = 0;
         game.gameDeposit = 0;
@@ -387,4 +405,39 @@ contract RockPaperScissors is Stoppable {
         (success, ) = msg.sender.call.value(amount)("");
         require(success, "failed to transfer funds");
     }
+
+    /**
+     * @dev This function allows the second player (player2) to cancel the game
+     * and reclaim all of the funds, when the first player (player1) has not
+     * revealed their move within the required time period.
+     * @return true if successful, false otherwise.
+     * Emits event: LogPlayer1ReclaimFunds.
+     */
+    function player2ClaimFunds()
+        public
+        ifAlive
+        ifRunning
+        returns (bool success)
+    {
+        require(game.player2 == msg.sender, "incorrect player");
+        require(game.commitment1 != 0, "player1 has not commited to a move");
+        require(game.gameMove1 == GameMoves.None, "player1 has revealed move");
+        require(now > game.revealExpiration, "game reveal not yet expired");
+        uint256 amount = 2 * game.gameDeposit;
+
+        //reset game
+        balance[game.player1] = 0;
+        balance[game.player2] = 0;
+        game.player1 = address(0);
+        game.player2 = address(0);
+        game.commitment1 = 0;
+        game.gameMove2 = GameMoves(0);
+        game.gameDeposit = 0;
+        game.moveExpiration = 0;
+        game.revealExpiration = 0;
+        emit LogPlayer2ClaimFunds(msg.sender, amount);
+        (success, ) = msg.sender.call.value(amount)("");
+        require(success, "failed to transfer funds");
+    }
+
 }
