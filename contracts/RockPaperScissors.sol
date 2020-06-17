@@ -42,8 +42,7 @@ contract RockPaperScissors is Stoppable {
         GameMoves gameMove1;
         GameMoves gameMove2;
         uint256 gameDeposit;
-        uint256 moveExpiration;
-        uint256 revealExpiration;
+        uint256 expiration;
     }
 
     mapping(address => uint256) balance;
@@ -176,7 +175,7 @@ contract RockPaperScissors is Stoppable {
         game.commitment1 = _commitment;
         game.gameDeposit = msg.value;
         balance[msg.sender] = game.gameDeposit;
-        game.moveExpiration = now + WAITPERIOD;
+        game.expiration = now + WAITPERIOD;
         emit LogMoveCommitPlayer1(msg.sender, _commitment, msg.value);
         return true;
     }
@@ -203,7 +202,7 @@ contract RockPaperScissors is Stoppable {
         game.player2 = msg.sender;
         game.gameMove2 = _gameMove;
         balance[msg.sender] = game.gameDeposit;
-        game.revealExpiration = now + WAITPERIOD;
+        game.expiration = now + WAITPERIOD;
         emit LogMovePlayer2(msg.sender, _gameMove, msg.value);
         return true;
     }
@@ -330,8 +329,7 @@ contract RockPaperScissors is Stoppable {
             game.gameMove2 = GameMoves(0);
             game.commitment1 = 0;
             game.gameDeposit = 0;
-            game.moveExpiration = 0;
-            game.revealExpiration = 0;
+            game.expiration = 0;
         }
 
         (success, ) = msg.sender.call.value(amount)("");
@@ -369,8 +367,7 @@ contract RockPaperScissors is Stoppable {
             game.gameMove2 = GameMoves(0);
             game.commitment1 = 0;
             game.gameDeposit = 0;
-            game.moveExpiration = 0;
-            game.revealExpiration = 0;
+            game.expiration = 0;
         }
 
         (success, ) = msg.sender.call.value(amount)("");
@@ -392,7 +389,7 @@ contract RockPaperScissors is Stoppable {
     {
         require(game.player1 == msg.sender, "incorrect player");
         require(game.player2 == address(0), "player2 has made a move");
-        require(now > game.moveExpiration, "game move not yet expired");
+        require(now > game.expiration, "game move not yet expired");
         uint256 amount = balance[game.player1];
         balance[game.player1] = 0;
 
@@ -400,7 +397,7 @@ contract RockPaperScissors is Stoppable {
         game.player1 = address(0);
         game.commitment1 = 0;
         game.gameDeposit = 0;
-        game.moveExpiration = 0;
+        game.expiration = 0;
         emit LogPlayer1ReclaimFunds(msg.sender, amount);
         (success, ) = msg.sender.call.value(amount)("");
         require(success, "failed to transfer funds");
@@ -422,7 +419,7 @@ contract RockPaperScissors is Stoppable {
         require(game.player2 == msg.sender, "incorrect player");
         require(game.commitment1 != 0, "player1 has not commited to a move");
         require(game.gameMove1 == GameMoves.None, "player1 has revealed move");
-        require(now > game.revealExpiration, "game reveal not yet expired");
+        require(now > game.expiration, "game reveal not yet expired");
         uint256 amount = 2 * game.gameDeposit;
 
         //reset game
@@ -433,11 +430,9 @@ contract RockPaperScissors is Stoppable {
         game.commitment1 = 0;
         game.gameMove2 = GameMoves(0);
         game.gameDeposit = 0;
-        game.moveExpiration = 0;
-        game.revealExpiration = 0;
+        game.expiration = 0;
         emit LogPlayer2ClaimFunds(msg.sender, amount);
         (success, ) = msg.sender.call.value(amount)("");
         require(success, "failed to transfer funds");
     }
-
 }

@@ -226,8 +226,7 @@ contract(
         assert.equal(game.gameMove2.toString(10), '0');
         assert.equal(game.commitment1, 0);
         assert.equal(game.gameDeposit, 0);
-        assert.equal(game.moveExpiration, 0);
-        assert.equal(game.revealExpiration, 0);
+        assert.equal(game.expiration, 0);
     });
 });
 
@@ -291,8 +290,7 @@ contract(
         assert.equal(game.gameMove2.toString(10), '0');
         assert.equal(game.commitment1, 0);
         assert.equal(game.gameDeposit, 0);
-        assert.equal(game.moveExpiration, 0);
-        assert.equal(game.revealExpiration, 0);
+        assert.equal(game.expiration, 0);
     });
 });
 
@@ -356,7 +354,6 @@ contract(
         assert.equal(game.gameMove2.toString(10), '0');
         assert.equal(game.commitment1, 0);
         assert.equal(game.gameDeposit, 0);
-        assert.equal(game.moveExpiration, 0);
-        assert.equal(game.revealExpiration, 0);
+        assert.equal(game.expiration, 0);
     });
 });
