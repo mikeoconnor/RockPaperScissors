@@ -44,7 +44,7 @@ contract RockPaperScissors is Stoppable {
         uint256 expiration;
     }
 
-    mapping(address => uint256) balance;
+    mapping(address => uint256) balances;
 
     GameDetailsStruct public game;
 
@@ -271,18 +271,18 @@ contract RockPaperScissors is Stoppable {
         if (idx == 0) {
             // player1 wins the game
             emit LogGameWinner(game.player1, 2 * game.gameDeposit);
-            balance[game.player1] = game.gameDeposit.mul(2);
-            balance[game.player2] = 0;
+            balances[game.player1] = game.gameDeposit.mul(2);
+            balances[game.player2] = 0;
         } else if (idx == 1) {
             // player2 wins the game
             emit LogGameWinner(game.player2, 2 * game.gameDeposit);
-            balance[game.player2] = game.gameDeposit.mul(2);
-            balance[game.player1] = 0;
+            balances[game.player2] = game.gameDeposit.mul(2);
+            balances[game.player1] = 0;
         } else if (idx == 2) {
             // player1 and player2 draw the game
             emit LogGameDraw(game.player1, game.player2, game.gameDeposit);
-            balance[game.player1] = game.gameDeposit;
-            balance[game.player2] = game.gameDeposit;
+            balances[game.player1] = game.gameDeposit;
+            balances[game.player2] = game.gameDeposit;
         } else {
             require(false, "unexpected winner index");
         }
@@ -345,7 +345,7 @@ contract RockPaperScissors is Stoppable {
         require(game.player1 == msg.sender, "incorrect player");
         require(game.gameMove2 == GameMoves.None, "player2 has made a move");
         require(now > game.expiration, "game move not yet expired");
-        balance[game.player1] = game.gameDeposit;
+        balances[game.player1] = game.gameDeposit;
         emit LogPlayer1ReclaimFunds(game.player1, game.gameDeposit);
 
         //reset game
@@ -373,8 +373,8 @@ contract RockPaperScissors is Stoppable {
         require(game.player2 == msg.sender, "incorrect player");
         require(game.commitment1 != 0, "player1 has not commited to a move");
         require(now > game.expiration, "game reveal not yet expired");
-        balance[game.player2] = game.gameDeposit.mul(2);
-        emit LogPlayer2ClaimFunds(game.player2, balance[game.player2]);
+        balances[game.player2] = game.gameDeposit.mul(2);
+        emit LogPlayer2ClaimFunds(game.player2, balances[game.player2]);
 
         //reset game
         game.player1 = address(0);
@@ -393,9 +393,9 @@ contract RockPaperScissors is Stoppable {
      */
     function withdraw() public returns (bool success){
         address sender = msg.sender;
-        require(balance[sender] > 0, "no funds");
-        uint256 amount = balance[sender];
-        balance[sender] = 0;
+        require(balances[sender] > 0, "no funds");
+        uint256 amount = balances[sender];
+        balances[sender] = 0;
         emit LogWithdraw(sender, amount);
         (success, ) = msg.sender.call.value(amount)("");
         require(success, "failed to transfer funds");
