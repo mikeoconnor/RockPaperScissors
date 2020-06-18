@@ -392,11 +392,10 @@ contract RockPaperScissors is Stoppable {
      * Emits event: LogWithdraw
      */
     function withdraw() public returns (bool success){
-        address sender = msg.sender;
-        require(balances[sender] > 0, "no funds");
-        uint256 amount = balances[sender];
-        balances[sender] = 0;
-        emit LogWithdraw(sender, amount);
+        require(balances[msg.sender] > 0, "no funds");
+        uint256 amount = balances[msg.sender];
+        balances[msg.sender] = 0;
+        emit LogWithdraw(msg.sender, amount);
         (success, ) = msg.sender.call.value(amount)("");
         require(success, "failed to transfer funds");
     }
