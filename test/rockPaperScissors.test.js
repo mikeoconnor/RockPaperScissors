@@ -22,7 +22,8 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
         tx = await instance.registerGame(gId, alice, bob, {from: owner});
         truffleAssert.eventEmitted(tx, 'LogGameCreation', evt => {
             return evt.player1 === alice
-                && evt.player2 === bob;
+                && evt.player2 === bob
+                && evt.gameId === gId;
         });
 
     });
@@ -54,7 +55,8 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
         tx = await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
         truffleAssert.eventEmitted(tx, 'LogMoveCommitPlayer1', evt => {
-            return evt.player === alice 
+            return evt.player === alice
+                && evt.gameId === gId
                 && evt.commitment === commitment
                 && evt.bet.toString(10) === GameDeposit.toString(10);
         });
@@ -74,7 +76,8 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
         tx = await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
         truffleAssert.eventEmitted(tx, 'LogMoveCommitPlayer1', evt => {
-            return evt.player === alice 
+            return evt.player === alice
+                && evt.gameId === gId
                 && evt.commitment === commitment
                 && evt.bet.toString(10) === GameDeposit.toString(10);
         });
@@ -82,7 +85,8 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
         // Bob game move
         tx = await instance.player2Move(gId, PAPER, {from: bob, value: GameDeposit});
         truffleAssert.eventEmitted(tx, 'LogMovePlayer2', evt => {
-            return evt.player === bob 
+            return evt.player === bob
+                && evt.gameId === gId
                 && evt.gameMove.toString(10) === PAPER.toString(10)
                 && evt.bet.toString(10) === GameDeposit.toString(10);
         });
@@ -92,7 +96,8 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
         tx = await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
         truffleAssert.eventEmitted(tx, 'LogMoveCommitPlayer1', evt => {
-            return evt.player === alice 
+            return evt.player === alice
+                && evt.gameId === gId
                 && evt.commitment === commitment
                 && evt.bet.toString(10) === GameDeposit.toString(10);
         });
@@ -123,6 +128,7 @@ contract('RockPaperScissors - Given game where alice has commited to a move', (a
         tx = await instance.player2Move(gId, PAPER, {from: bob, value: GameDeposit});
         truffleAssert.eventEmitted(tx, 'LogMovePlayer2', evt => {
             return evt.player === bob
+                && evt.gameId === gId
                 && evt.gameMove.toString(10) === PAPER.toString(10)
                 && evt.bet.toString(10) === GameDeposit.toString(10);
         });
@@ -169,6 +175,7 @@ contract('RockPaperScissors - Given game where alice has commited to a move', (a
         tx = await instance.player1ReclaimFunds(gId, {from: alice});
         truffleAssert.eventEmitted(tx, 'LogPlayer1ReclaimFunds', evt => {
             return evt.player === alice
+                && evt.gameId === gId
                 && evt.amount.toString(10) === GameDeposit.toString(10);
         });
     });
@@ -262,6 +269,7 @@ contract(
         tx = await instance.player2ClaimFunds(gId, {from: bob});
         truffleAssert.eventEmitted(tx, 'LogPlayer2ClaimFunds', evt => {
             return evt.player === bob
+                && evt.gameId === gId
                 && evt.amount.toString(10) === (GameDeposit*2).toString(10);
         });
 
@@ -306,7 +314,8 @@ contract(
     it('should allow alice to reveal move', async() => {
         tx = await instance.player1MoveReveal(gId, ROCK, secretAlice, {from: alice});
         truffleAssert.eventEmitted(tx, 'LogMoveReveal', evt => {
-            return evt.player === alice 
+            return evt.player === alice
+                && evt.gameId === gId
                 && evt.gameMove.toString(10) === ROCK.toString(10);
         });
     });
@@ -314,13 +323,15 @@ contract(
     it('should allow alice reveal move and bob to claim winnings', async() => {
         tx = await instance.player1MoveReveal(gId, ROCK, secretAlice, {from: alice});
         truffleAssert.eventEmitted(tx, 'LogMoveReveal', evt => {
-            return evt.player === alice 
+            return evt.player === alice
+                && evt.gameId === gId
                 && evt.gameMove.toString(10) === ROCK.toString(10);
         });
         
         // bob wins game because PAPER beats ROCK
         truffleAssert.eventEmitted(tx, 'LogGameWinner', evt => {
-            return evt.player === bob 
+            return evt.player === bob
+                && evt.gameId === gId
                 && evt.winnings.toString(10) === (GameDeposit*2).toString(10);
         });
         
@@ -372,7 +383,8 @@ contract(
     it('should allow alice to reveal move', async() => {
         tx = await instance.player1MoveReveal(gId, ROCK, secretAlice, {from: alice});
         truffleAssert.eventEmitted(tx, 'LogMoveReveal', evt => {
-            return evt.player === alice 
+            return evt.player === alice
+                && evt.gameId === gId
                 && evt.gameMove.toString(10) === ROCK.toString(10);
         });
     });
@@ -380,7 +392,8 @@ contract(
     it('should allow alice reveal move and then both alice and bob to claim winnings', async() => {
         tx = await instance.player1MoveReveal(gId, ROCK, secretAlice, {from: alice});
         truffleAssert.eventEmitted(tx, 'LogMoveReveal', evt => {
-            return evt.player === alice 
+            return evt.player === alice
+                && evt.gameId === gId
                 && evt.gameMove.toString(10) === ROCK.toString(10);
         });
         
@@ -388,6 +401,7 @@ contract(
         truffleAssert.eventEmitted(tx, 'LogGameDraw', evt => {
             return evt.player0 === alice
                 && evt.player1 === bob
+                && evt.gameId === gId
                 && evt.winnings.toString(10) === GameDeposit.toString(10);
         });
         

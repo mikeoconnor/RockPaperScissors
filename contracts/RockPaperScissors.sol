@@ -65,17 +65,24 @@ contract RockPaperScissors is Stoppable {
      * players.
      * @param player1 - the first game player.
      * @param player2 - the second game player.
+     * @param gameId - the game ID.
      */
-    event LogGameCreation(address indexed player1, address indexed player2);
+    event LogGameCreation(
+        address indexed player1,
+        address indexed player2,
+        bytes32 indexed gameId
+    );
 
     /**
      * @dev Log that first player (player1) has commited to a move.
      * @param player - address of player commiting move.
+     * @param gameId - the game ID.
      * @param commitment - cryptographic hash of committed move.
      * @param bet - the amount of wei player spent to play move.
      */
     event LogMoveCommitPlayer1(
         address indexed player,
+        bytes32 indexed gameId,
         bytes32 indexed commitment,
         uint256 bet
     );
@@ -83,11 +90,13 @@ contract RockPaperScissors is Stoppable {
     /**
      * @dev Log that second player (player2) has made a move.
      * @param player - address of player making move.
+     * @param gameId - the game ID.
      * @param gameMove - the game move.
      * @param bet - the amount of wei player spent to play move.
      */
     event LogMovePlayer2(
         address indexed player,
+        bytes32 indexed gameId,
         GameMoves gameMove,
         uint256 bet
     );
@@ -95,26 +104,38 @@ contract RockPaperScissors is Stoppable {
     /**
      * @dev Log that a player has their game move revealed.
      * @param player - address of player revealing move.
+     * @param gameId - the game ID.
      * @param gameMove - the revealed game move.
      */
-    event LogMoveReveal(address indexed player, GameMoves gameMove);
+    event LogMoveReveal(
+        address indexed player,
+        bytes32 indexed gameId,
+        GameMoves gameMove
+    );
 
     /**
      * @dev Log that a play has won the game.
      * @param player - address of winning player.
+     * @param gameId - the game ID.
      * @param winnings - the amount of wei available to winning player.
      */
-    event LogGameWinner(address indexed player, uint256 winnings);
+    event LogGameWinner(
+        address indexed player,
+        bytes32 indexed gameId,
+        uint256 winnings
+    );
 
     /**
      * @dev Log that a game was drawn.
      * @param player0 - address of first player.
      * @param player1 - address of second player.
+     * @param gameId - the game ID.
      * @param winnings - the amount of wei available to both players.
      */
     event LogGameDraw(
         address indexed player0,
         address indexed player1,
+        bytes32 indexed gameId,
         uint256 winnings
     );
 
@@ -130,9 +151,14 @@ contract RockPaperScissors is Stoppable {
      * withdrawn their funds, because the second player (player2) has not made
      * a move within the required time period.
      * @param player - address of player.
+     * @param gameId - the game ID.
      * @param amount - the amount of wei withdrawn.
      */
-    event LogPlayer1ReclaimFunds(address indexed player, uint256 amount);
+    event LogPlayer1ReclaimFunds(
+        address indexed player,
+        bytes32 indexed gameId,
+        uint256 amount
+    );
 
     /**
      * @dev Log that a second player (player2) has cancelled the game and
@@ -141,7 +167,11 @@ contract RockPaperScissors is Stoppable {
      * @param player - address of player.
      * @param amount - the amount of wei withdrawn.
      */
-    event LogPlayer2ClaimFunds(address indexed player, uint256 amount);
+    event LogPlayer2ClaimFunds(
+        address indexed player,
+        bytes32 indexed gameId,
+        uint256 amount
+    );
 
     /**
      * @dev This function registers the players for a game.
@@ -171,7 +201,7 @@ contract RockPaperScissors is Stoppable {
         );
         games[_gameId].player1 = _player1;
         games[_gameId].player2 = _player2;
-        emit LogGameCreation(_player1, _player2);
+        emit LogGameCreation(_player1, _player2, _gameId);
         return true;
     }
 
@@ -234,7 +264,7 @@ contract RockPaperScissors is Stoppable {
         games[_gameId].commitment1 = _commitment;
         games[_gameId].gameDeposit = msg.value;
         games[_gameId].expiration = now + WAITPERIOD;
-        emit LogMoveCommitPlayer1(msg.sender, _commitment, msg.value);
+        emit LogMoveCommitPlayer1(msg.sender, _gameId, _commitment, msg.value);
         return true;
     }
 
@@ -268,7 +298,7 @@ contract RockPaperScissors is Stoppable {
         );
         games[_gameId].gameMove2 = _gameMove;
         games[_gameId].expiration = now + WAITPERIOD;
-        emit LogMovePlayer2(msg.sender, _gameMove, msg.value);
+        emit LogMovePlayer2(msg.sender, _gameId, _gameMove, msg.value);
         return true;
     }
 
@@ -301,7 +331,7 @@ contract RockPaperScissors is Stoppable {
             games[_gameId].commitment1 == generateCommitment(_gameMove1, secret),
             "failed to verify commitment"
         );
-        emit LogMoveReveal(msg.sender, _gameMove1);
+        emit LogMoveReveal(msg.sender, _gameId, _gameMove1);
         determineGameResult(_gameId, _gameMove1, games[_gameId].gameMove2);
         return true;
     }
@@ -329,6 +359,7 @@ contract RockPaperScissors is Stoppable {
             // player1 wins the game
             emit LogGameWinner(
                 games[_gameId].player1,
+                _gameId,
                 games[_gameId].gameDeposit.mul(2)
             );
             balances[games[_gameId].player1] = balances[games[_gameId].player1]
@@ -337,6 +368,7 @@ contract RockPaperScissors is Stoppable {
             // player2 wins the game
             emit LogGameWinner(
                 games[_gameId].player2,
+                _gameId,
                 games[_gameId].gameDeposit.mul(2)
             );
             balances[games[_gameId].player2] = balances[games[_gameId].player2]
@@ -346,6 +378,7 @@ contract RockPaperScissors is Stoppable {
             emit LogGameDraw(
                 games[_gameId].player1,
                 games[_gameId].player2,
+                _gameId,
                 games[_gameId].gameDeposit
             );
             balances[games[_gameId].player1] = balances[games[_gameId].player1]
@@ -423,6 +456,7 @@ contract RockPaperScissors is Stoppable {
             .add(games[_gameId].gameDeposit);
         emit LogPlayer1ReclaimFunds(
             games[_gameId].player1,
+            _gameId,
             games[_gameId].gameDeposit
         );
 
@@ -463,6 +497,7 @@ contract RockPaperScissors is Stoppable {
             .add(games[_gameId].gameDeposit.mul(2));
         emit LogPlayer2ClaimFunds(
             games[_gameId].player2,
+            _gameId,
             games[_gameId].gameDeposit.mul(2)
         );
 
