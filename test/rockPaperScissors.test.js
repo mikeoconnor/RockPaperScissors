@@ -429,3 +429,89 @@ contract(
         assert.equal(game.expiration, 0);
     });
 });
+
+contract(
+    'RockPaperScissors - Given two diffrenet games where alice wins when her move is revealed',
+    (accounts) => {
+    const owner = accounts[0];
+    const alice = accounts[4];
+    const bob = accounts[5];
+    const carol = accounts[6];
+    const GameDeposit = web3.utils.toWei('5', 'finney');
+    const secretAlice = web3.utils.utf8ToHex("secretForAlice");
+    const secretAlice2 = web3.utils.utf8ToHex("anotherscret");
+    let gId1 = null;
+    let gId2 = null;
+
+    before('set up contract and moves', async () => {
+        instance = await RockPaperScissors.new({from: owner});
+        gId1 = await instance.generateGameId(alice, bob);
+        gId2 = await instance.generateGameId(alice, carol);
+        await instance.registerGame(gId1, alice, bob, {from: owner});
+        await instance.registerGame(gId2, alice, carol, {from: owner});
+        let commitment = await instance.generateCommitment(PAPER, secretAlice);
+        await instance.player1MoveCommit(gId1, commitment, {from: alice, value: GameDeposit});
+        await instance.player2Move(gId1, ROCK, {from: bob, value: GameDeposit});
+        commitment = await instance.generateCommitment(PAPER, secretAlice2);
+        await instance.player1MoveCommit(gId2, commitment, {from: alice, value: GameDeposit});
+        await instance.player2Move(gId2, ROCK, {from: carol, value: GameDeposit});
+    });
+
+    it('should allow alice to reveal move and win game1', async() => {
+        tx = await instance.player1MoveReveal(gId1, PAPER, secretAlice, {from: alice});
+        truffleAssert.eventEmitted(tx, 'LogMoveReveal', evt => {
+            return evt.player === alice
+                && evt.gameId === gId1
+                && evt.gameMove.toString(10) === PAPER.toString(10);
+        });
+
+        // alice wins game1 because PAPER beats ROCK
+        truffleAssert.eventEmitted(tx, 'LogGameWinner', evt => {
+            return evt.player === alice
+                && evt.gameId === gId1
+                && evt.winnings.toString(10) === (GameDeposit*2).toString(10);
+        });
+
+        // Assert that game1 has been reset
+        let game = await instance.games(gId1);
+        assert.equal(game.player1, 0);
+        assert.equal(game.player2, 0);
+        assert.equal(game.gameMove2.toString(10), '0');
+        assert.equal(game.commitment1, 0);
+        assert.equal(game.gameDeposit, 0);
+        assert.equal(game.expiration, 0);
+    });
+
+    it('should then allow alice to reveal move and win game2', async() => {
+        tx = await instance.player1MoveReveal(gId2, PAPER, secretAlice2, {from: alice});
+        truffleAssert.eventEmitted(tx, 'LogMoveReveal', evt => {
+            return evt.player === alice
+                && evt.gameId === gId2
+                && evt.gameMove.toString(10) === PAPER.toString(10);
+        });
+
+        // alice wins game2 because PAPER beats ROCK
+        truffleAssert.eventEmitted(tx, 'LogGameWinner', evt => {
+            return evt.player === alice
+                && evt.gameId === gId2
+                && evt.winnings.toString(10) === (GameDeposit*2).toString(10);
+        });
+
+        // Assert that game2 has been reset
+        let game = await instance.games(gId2);
+        assert.equal(game.player1, 0);
+        assert.equal(game.player2, 0);
+        assert.equal(game.gameMove2.toString(10), '0');
+        assert.equal(game.commitment1, 0);
+        assert.equal(game.gameDeposit, 0);
+        assert.equal(game.expiration, 0);
+    });
+
+    it('should then allow alice to withdraw winnings', async() => {
+        tx = await instance.withdraw({from: alice});
+        truffleAssert.eventEmitted(tx, 'LogWithdraw', evt => {
+            return evt.sender === alice
+                && evt.amount.toString(10) === (GameDeposit*4).toString(10);
+        });
+    });
+});
