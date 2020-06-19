@@ -44,9 +44,9 @@ contract RockPaperScissors is Stoppable {
         uint256 expiration;
     }
 
-    mapping(address => uint256) balances;
+    mapping(address => uint256) public balances;
 
-    GameDetailsStruct public game;
+    mapping(bytes32 => GameDetailsStruct) public games;
 
     // Wait for a period of 10 mins
     uint256 public constant WAITPERIOD = 600;
@@ -145,26 +145,49 @@ contract RockPaperScissors is Stoppable {
 
     /**
      * @dev This function registers the players for a game.
+     * @param _gameId - the game ID.
      * @param _player1 - the first player.
      * @param _player2 - the second player.
      * @return true if successful, false otherwise.
      * Emits event: LogGameCreation.
      */
-    function registerGame(address _player1, address _player2)
+    function registerGame(bytes32 _gameId, address _player1, address _player2)
         public
         ifAlive
         ifRunning
         returns (bool success)
     {
+        require(_gameId != 0, "invalid game Id");
         require(_player1 != address(0), "invalid address for player1");
         require(_player2 != address(0), "invalid address for player2");
         require(_player1 != _player2, "player1 equals player2");
-        require(game.player1 == address(0), "player1 already exists");
-        require(game.player2 == address(0), "player2 already exists");
-        game.player1 = _player1;
-        game.player2 = _player2;
+        require(
+            games[_gameId].player1 == address(0),
+            "player1 already exists"
+        );
+        require(
+            games[_gameId].player2 == address(0),
+            "player2 already exists"
+        );
+        games[_gameId].player1 = _player1;
+        games[_gameId].player2 = _player2;
         emit LogGameCreation(_player1, _player2);
         return true;
+    }
+
+    /**
+     * @dev This function generates a game ID that is unique to a particular
+     * game.
+     * @param _player1 - the address of the first player.
+     * @param _player2 - the address of the second player.
+     * @return The game ID.
+     */
+    function generateGameId(address _player1, address _player2)
+        public
+        pure
+        returns (bytes32 gameId)
+    {
+        return keccak256(abi.encode(_player1, _player2));
     }
 
     /**
@@ -188,24 +211,29 @@ contract RockPaperScissors is Stoppable {
      * as a commitment (cryptographic hash of game move). Player1 also
      * determines the game deposite (the funds that player2 will have to
      * deposit to play the game).
+     * @param _gameId - the game ID.
      * @param _commitment - Cryptographic hash of player's move.
      * @return true if successfull, false otherwise.
      * Emits event: LogMoveCommitPlayer1.
      */
-    function player1MoveCommit(bytes32 _commitment)
+    function player1MoveCommit(bytes32 _gameId, bytes32 _commitment)
         public
         payable
         ifAlive
         ifRunning
         returns (bool success)
     {
+        require(_gameId != 0, "invalid game Id");
         require(_commitment != 0, "commitment should be non zero");
-        require(game.player1 == msg.sender, "incorrect player");
+        require(games[_gameId].player1 == msg.sender, "incorrect player");
         require(msg.value != 0, "a game deposit is required");
-        require(game.commitment1 == 0, "player1 already commited to a move");
-        game.commitment1 = _commitment;
-        game.gameDeposit = msg.value;
-        game.expiration = now + WAITPERIOD;
+        require(
+            games[_gameId].commitment1 == 0,
+            "player1 already commited to a move"
+        );
+        games[_gameId].commitment1 = _commitment;
+        games[_gameId].gameDeposit = msg.value;
+        games[_gameId].expiration = now + WAITPERIOD;
         emit LogMoveCommitPlayer1(msg.sender, _commitment, msg.value);
         return true;
     }
@@ -214,11 +242,12 @@ contract RockPaperScissors is Stoppable {
      * @dev This function records the game move of the second player (player2).
      * This function can only be called after player1MoveCommit and player2
      * has to match the funds deposited by player1 in order to play.
+     * @param _gameId - the game ID.
      * @param _gameMove - the move made by player2.
      * @return true if successfull, false otherwise.
      * Emits event: LogMovePlayer2.
      */
-    function player2Move(GameMoves _gameMove)
+    function player2Move(bytes32 _gameId, GameMoves _gameMove)
         public
         payable
         ifAlive
@@ -226,12 +255,19 @@ contract RockPaperScissors is Stoppable {
         moveIsValid(_gameMove)
         returns (bool success)
     {
-        require(game.gameDeposit > 0, "game deposit not set");
-        require(game.player2 == msg.sender, "incorrect player");
-        require(msg.value == game.gameDeposit, "incorrect deposite to play game");
-        require(game.gameMove2 == GameMoves.None, "player2 has already made a move");
-        game.gameMove2 = _gameMove;
-        game.expiration = now + WAITPERIOD;
+        require(_gameId != 0, "invalid game Id");
+        require(games[_gameId].gameDeposit > 0, "game deposit not set");
+        require(games[_gameId].player2 == msg.sender, "incorrect player");
+        require(
+            msg.value == games[_gameId].gameDeposit,
+            "incorrect deposite to play game"
+        );
+        require(
+            games[_gameId].gameMove2 == GameMoves.None,
+            "player2 has already made a move"
+        );
+        games[_gameId].gameMove2 = _gameMove;
+        games[_gameId].expiration = now + WAITPERIOD;
         emit LogMovePlayer2(msg.sender, _gameMove, msg.value);
         return true;
     }
@@ -242,25 +278,31 @@ contract RockPaperScissors is Stoppable {
      * commitment.
      * Note: This function also determines the result of the game and
      * redistributes the funds accordingly.
+     * @param _gameId - the game ID.
      * @param _gameMove1 - The game move of player1.
      * @param secret - The secret used to generate the commitment.
      * @return true if successfull, false otherwise.
      * Emits events: LogMoveReveal, LogGameWinner, LogGameDraw
      */
-    function player1MoveReveal(GameMoves _gameMove1, bytes32 secret)
+    function player1MoveReveal(
+        bytes32 _gameId,
+        GameMoves _gameMove1,
+        bytes32 secret
+    )
         public
         ifAlive
         ifRunning
         moveIsValid(_gameMove1)
         returns (bool success)
     {
-        require(game.player1 == msg.sender, "incorrect player1");
+        require(_gameId != 0, "invalid game Id");
+        require(games[_gameId].player1 == msg.sender, "incorrect player1");
         require(
-            game.commitment1 == generateCommitment(_gameMove1, secret),
+            games[_gameId].commitment1 == generateCommitment(_gameMove1, secret),
             "failed to verify commitment"
         );
         emit LogMoveReveal(msg.sender, _gameMove1);
-        determineGameResult(_gameMove1, game.gameMove2);
+        determineGameResult(_gameId, _gameMove1, games[_gameId].gameMove2);
         return true;
     }
 
@@ -268,11 +310,16 @@ contract RockPaperScissors is Stoppable {
      * @dev This functions reveals the result of the game. That is was the
      * game won or drawn. It re-distrubutes the players funds according to the
      * outcome of the game.
+     * @param _gameId - the game ID.
      * @param _gameMove1 - the move of player1.
      * @param _gameMove2 - the move of player2.
      * Emits events: LogGameWinner, LogGameDraw
      */
-    function determineGameResult(GameMoves _gameMove1, GameMoves _gameMove2)
+    function determineGameResult(
+        bytes32 _gameId,
+        GameMoves _gameMove1,
+        GameMoves _gameMove2
+    )
         internal
         moveIsValid(_gameMove1)
         moveIsValid(_gameMove2)
@@ -280,30 +327,42 @@ contract RockPaperScissors is Stoppable {
         uint8 idx = gameWinner(_gameMove1, _gameMove2);
         if (idx == 0) {
             // player1 wins the game
-            emit LogGameWinner(game.player1, 2 * game.gameDeposit);
-            balances[game.player1] = game.gameDeposit.mul(2);
-            balances[game.player2] = 0;
+            emit LogGameWinner(
+                games[_gameId].player1,
+                games[_gameId].gameDeposit.mul(2)
+            );
+            balances[games[_gameId].player1] = balances[games[_gameId].player1]
+                .add(games[_gameId].gameDeposit.mul(2));
         } else if (idx == 1) {
             // player2 wins the game
-            emit LogGameWinner(game.player2, 2 * game.gameDeposit);
-            balances[game.player2] = game.gameDeposit.mul(2);
-            balances[game.player1] = 0;
+            emit LogGameWinner(
+                games[_gameId].player2,
+                games[_gameId].gameDeposit.mul(2)
+            );
+            balances[games[_gameId].player2] = balances[games[_gameId].player2]
+                .add(games[_gameId].gameDeposit.mul(2));
         } else if (idx == 2) {
             // player1 and player2 draw the game
-            emit LogGameDraw(game.player1, game.player2, game.gameDeposit);
-            balances[game.player1] = game.gameDeposit;
-            balances[game.player2] = game.gameDeposit;
+            emit LogGameDraw(
+                games[_gameId].player1,
+                games[_gameId].player2,
+                games[_gameId].gameDeposit
+            );
+            balances[games[_gameId].player1] = balances[games[_gameId].player1]
+                .add(games[_gameId].gameDeposit);
+            balances[games[_gameId].player2] = balances[games[_gameId].player2]
+                .add(games[_gameId].gameDeposit);
         } else {
             require(false, "unexpected winner index");
         }
 
         // reset game
-        game.player1 = address(0);
-        game.player2 = address(0);
-        game.gameMove2 = GameMoves(0);
-        game.commitment1 = 0;
-        game.gameDeposit = 0;
-        game.expiration = 0;
+        games[_gameId].player1 = address(0);
+        games[_gameId].player2 = address(0);
+        games[_gameId].gameMove2 = GameMoves(0);
+        games[_gameId].commitment1 = 0;
+        games[_gameId].gameDeposit = 0;
+        games[_gameId].expiration = 0;
     }
 
     /**
@@ -343,27 +402,36 @@ contract RockPaperScissors is Stoppable {
      * @dev This function allows the first player (player1) to cancel the game
      * and reclaim their funds, when the second player (player2) has not made
      * their move within the required time period.
+     * @param _gameId - the game ID.
      * @return true if successful, false otherwise.
      * Emits event: LogPlayer1ReclaimFunds.
      */
-    function player1ReclaimFunds()
+    function player1ReclaimFunds(bytes32 _gameId)
         public
         ifAlive
         ifRunning
         returns (bool success)
     {
-        require(game.player1 == msg.sender, "incorrect player");
-        require(game.gameMove2 == GameMoves.None, "player2 has made a move");
-        require(now > game.expiration, "game move not yet expired");
-        balances[game.player1] = game.gameDeposit;
-        emit LogPlayer1ReclaimFunds(game.player1, game.gameDeposit);
+        require(_gameId != 0, "invalid game Id");
+        require(games[_gameId].player1 == msg.sender, "incorrect player");
+        require(
+            games[_gameId].gameMove2 == GameMoves.None,
+            "player2 has made a move"
+        );
+        require(now > games[_gameId].expiration, "game move not yet expired");
+        balances[games[_gameId].player1] = balances[games[_gameId].player1]
+            .add(games[_gameId].gameDeposit);
+        emit LogPlayer1ReclaimFunds(
+            games[_gameId].player1,
+            games[_gameId].gameDeposit
+        );
 
         //reset game
-        game.player1 = address(0);
-        game.player2 = address(0);
-        game.commitment1 = 0;
-        game.gameDeposit = 0;
-        game.expiration = 0;
+        games[_gameId].player1 = address(0);
+        games[_gameId].player2 = address(0);
+        games[_gameId].commitment1 = 0;
+        games[_gameId].gameDeposit = 0;
+        games[_gameId].expiration = 0;
         return true;
     }
 
@@ -371,28 +439,40 @@ contract RockPaperScissors is Stoppable {
      * @dev This function allows the second player (player2) to cancel the game
      * and reclaim all of the funds, when the first player (player1) has not
      * revealed their move within the required time period.
+     * @param _gameId - the game ID.
      * @return true if successful, false otherwise.
      * Emits event: LogPlayer1ReclaimFunds.
      */
-    function player2ClaimFunds()
+    function player2ClaimFunds(bytes32 _gameId)
         public
         ifAlive
         ifRunning
         returns (bool success)
     {
-        require(game.player2 == msg.sender, "incorrect player");
-        require(game.commitment1 != 0, "player1 has not commited to a move");
-        require(now > game.expiration, "game reveal not yet expired");
-        balances[game.player2] = game.gameDeposit.mul(2);
-        emit LogPlayer2ClaimFunds(game.player2, balances[game.player2]);
+        require(_gameId != 0, "invalid game Id");
+        require(games[_gameId].player2 == msg.sender, "incorrect player");
+        require(
+            games[_gameId].commitment1 != 0,
+            "player1 has not commited to a move"
+        );
+        require(
+            now > games[_gameId].expiration,
+            "game reveal not yet expired"
+        );
+        balances[games[_gameId].player2] = balances[games[_gameId].player2]
+            .add(games[_gameId].gameDeposit.mul(2));
+        emit LogPlayer2ClaimFunds(
+            games[_gameId].player2,
+            games[_gameId].gameDeposit.mul(2)
+        );
 
         //reset game
-        game.player1 = address(0);
-        game.player2 = address(0);
-        game.commitment1 = 0;
-        game.gameMove2 = GameMoves(0);
-        game.gameDeposit = 0;
-        game.expiration = 0;
+        games[_gameId].player1 = address(0);
+        games[_gameId].player2 = address(0);
+        games[_gameId].commitment1 = 0;
+        games[_gameId].gameMove2 = GameMoves(0);
+        games[_gameId].gameDeposit = 0;
+        games[_gameId].expiration = 0;
         return true;
     }
 
