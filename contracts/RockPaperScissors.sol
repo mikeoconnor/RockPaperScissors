@@ -144,17 +144,27 @@ contract RockPaperScissors is Stoppable {
     event LogPlayer2ClaimFunds(address indexed player, uint256 amount);
 
     /**
-     * @dev The constructor for the rock paper scissors game.
-     * @param _player1 - the address of the first player.
-     * @param _player2 - the address of the second player.
+     * @dev This function registers the players for a game.
+     * @param _player1 - the first player.
+     * @param _player2 - the second player.
+     * @return true if successful, false otherwise.
+     * Emits event: LogGameCreation.
      */
-    constructor(address _player1, address _player2) public {
+    function registerGame(address _player1, address _player2)
+        public
+        ifAlive
+        ifRunning
+        returns (bool success)
+    {
         require(_player1 != address(0), "invalid address for player1");
         require(_player2 != address(0), "invalid address for player2");
         require(_player1 != _player2, "player1 equals player2");
+        require(game.player1 == address(0), "player1 already exists");
+        require(game.player2 == address(0), "player2 already exists");
         game.player1 = _player1;
         game.player2 = _player2;
         emit LogGameCreation(_player1, _player2);
+        return true;
     }
 
     /**
