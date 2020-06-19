@@ -12,11 +12,38 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
     const owner = accounts[0];
     const alice = accounts[4];
     const bob = accounts[5];
+
+    beforeEach('set up contract', async() => {
+        instance = await RockPaperScissors.new({from: owner});
+    });
+
+    it('should allow alice and bob to register', async() => {
+        tx = await instance.registerGame(alice, bob, {from: owner});
+        truffleAssert.eventEmitted(tx, 'LogGameCreation', evt => {
+            return evt.player1 === alice
+                && evt.player2 === bob;
+        });
+
+    });
+
+    it('should not allow same player to register twice', async() => {
+        await truffleAssert.reverts(
+            instance.registerGame(bob, bob, {from: owner}),
+            "player1 equals player2"
+        );
+    });
+});
+
+contract('RockPaperScissors - Given new contract', (accounts) => {
+    const owner = accounts[0];
+    const alice = accounts[4];
+    const bob = accounts[5];
     const GameDeposit = web3.utils.toWei('5', 'finney');
     const secretAlice = web3.utils.utf8ToHex("secretForAlice");
     
     beforeEach('set up contract', async () => {
-        instance = await RockPaperScissors.new(alice, bob, {from: owner});
+        instance = await RockPaperScissors.new({from: owner});
+        await instance.registerGame(alice, bob, {from: owner});
     });
     
     it('should allow allice (player1) to commit to a move', async() => {
@@ -80,7 +107,8 @@ contract('RockPaperScissors - Given game where alice has commited to a move', (a
     const secretAlice = web3.utils.utf8ToHex("secretForAlice");
 
     beforeEach('set up contract and alice commit to a move', async () => {
-        instance = await RockPaperScissors.new(alice, bob, {from: owner});
+        instance = await RockPaperScissors.new({from: owner});
+        await instance.registerGame(alice, bob, {from: owner});
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
         await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
     });
@@ -115,7 +143,8 @@ contract('RockPaperScissors - Given game where alice has commited to a move', (a
     const secretAlice = web3.utils.utf8ToHex("secretForAlice");
 
     before('set up contract and alice commit to a move', async () => {
-        instance = await RockPaperScissors.new(alice, bob, {from: owner});
+        instance = await RockPaperScissors.new({from: owner});
+        await instance.registerGame(alice, bob, {from: owner});
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
         await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
         let snapshot = await tm.takeSnapshot();
@@ -162,7 +191,8 @@ contract(
     const secretAlice = web3.utils.utf8ToHex("secretForAlice");
 
     beforeEach('set up contract and moves', async() => {
-        instance = await RockPaperScissors.new(alice, bob, {from: owner});
+        instance = await RockPaperScissors.new({from: owner});
+        await instance.registerGame(alice, bob, {from: owner});
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
         await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
         await instance.player2Move(PAPER, {from: bob, value: GameDeposit});
@@ -201,7 +231,8 @@ contract(
     const secretAlice = web3.utils.utf8ToHex("secretForAlice");
 
     before('set up contract and moves', async () => {
-        instance = await RockPaperScissors.new(alice, bob, {from: owner});
+        instance = await RockPaperScissors.new({from: owner});
+        await instance.registerGame(alice, bob, {from: owner});
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
         await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
         await instance.player2Move(PAPER, {from: bob, value: GameDeposit});
@@ -251,7 +282,8 @@ contract(
     const secretAlice = web3.utils.utf8ToHex("secretForAlice");
     
     beforeEach('set up contract and moves', async () => {
-        instance = await RockPaperScissors.new(alice, bob, {from: owner});
+        instance = await RockPaperScissors.new({from: owner});
+        await instance.registerGame(alice, bob, {from: owner});
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
         await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
         await instance.player2Move(PAPER, {from: bob, value: GameDeposit});
@@ -314,7 +346,8 @@ contract(
     const secretAlice = web3.utils.utf8ToHex("secretForAlice");
     
     beforeEach('set up contract and moves', async () => {
-        instance = await RockPaperScissors.new(alice, bob, {from: owner});
+        instance = await RockPaperScissors.new({from: owner});
+        await instance.registerGame(alice, bob, {from: owner});
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
         await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
         await instance.player2Move(ROCK, {from: bob, value: GameDeposit});
