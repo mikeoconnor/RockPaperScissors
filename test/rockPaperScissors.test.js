@@ -18,7 +18,8 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
     });
 
     it('should allow alice and bob to register', async() => {
-        tx = await instance.registerGame(alice, bob, {from: owner});
+        let gId = await instance.generateGameId(alice, bob);
+        tx = await instance.registerGame(gId, alice, bob, {from: owner});
         truffleAssert.eventEmitted(tx, 'LogGameCreation', evt => {
             return evt.player1 === alice
                 && evt.player2 === bob;
@@ -27,8 +28,9 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
     });
 
     it('should not allow same player to register twice', async() => {
+        let gId = await instance.generateGameId(alice, bob);
         await truffleAssert.reverts(
-            instance.registerGame(bob, bob, {from: owner}),
+            instance.registerGame(gId, bob, bob, {from: owner}),
             "player1 equals player2"
         );
     });
@@ -40,15 +42,17 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
     const bob = accounts[5];
     const GameDeposit = web3.utils.toWei('5', 'finney');
     const secretAlice = web3.utils.utf8ToHex("secretForAlice");
+    let gId = null;
     
     beforeEach('set up contract', async () => {
         instance = await RockPaperScissors.new({from: owner});
-        await instance.registerGame(alice, bob, {from: owner});
+        gId = await instance.generateGameId(alice, bob);
+        await instance.registerGame(gId, alice, bob, {from: owner});
     });
     
     it('should allow allice (player1) to commit to a move', async() => {
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
-        tx = await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
+        tx = await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
         truffleAssert.eventEmitted(tx, 'LogMoveCommitPlayer1', evt => {
             return evt.player === alice 
                 && evt.commitment === commitment
@@ -60,7 +64,7 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
     
     it('should not allow bob (player2) to make a move', async() => {
         await truffleAssert.reverts(
-            instance.player2Move(PAPER, {from: bob, value: GameDeposit}),
+            instance.player2Move(gId, PAPER, {from: bob, value: GameDeposit}),
             "game deposit not set"
         );
     });
@@ -68,7 +72,7 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
     it ('should allow alice to commit to a move and then bob to make a move', async() => {
         // Alice game move commitment
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
-        tx = await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
+        tx = await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
         truffleAssert.eventEmitted(tx, 'LogMoveCommitPlayer1', evt => {
             return evt.player === alice 
                 && evt.commitment === commitment
@@ -76,7 +80,7 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
         });
         
         // Bob game move
-        tx = await instance.player2Move(PAPER, {from: bob, value: GameDeposit});
+        tx = await instance.player2Move(gId, PAPER, {from: bob, value: GameDeposit});
         truffleAssert.eventEmitted(tx, 'LogMovePlayer2', evt => {
             return evt.player === bob 
                 && evt.gameMove.toString(10) === PAPER.toString(10)
@@ -86,14 +90,14 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
     
     it('should not allow alice to commit twice', async() => {
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
-        tx = await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
+        tx = await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
         truffleAssert.eventEmitted(tx, 'LogMoveCommitPlayer1', evt => {
             return evt.player === alice 
                 && evt.commitment === commitment
                 && evt.bet.toString(10) === GameDeposit.toString(10);
         });
         await truffleAssert.reverts(
-            instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit}),
+            instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit}),
             "player1 already commited to a move"
         );
     });
@@ -105,30 +109,32 @@ contract('RockPaperScissors - Given game where alice has commited to a move', (a
     const bob = accounts[5];
     const GameDeposit = web3.utils.toWei('5', 'finney');
     const secretAlice = web3.utils.utf8ToHex("secretForAlice");
+    let gId = null;
 
     beforeEach('set up contract and alice commit to a move', async () => {
         instance = await RockPaperScissors.new({from: owner});
-        await instance.registerGame(alice, bob, {from: owner});
+        gId = await instance.generateGameId(alice, bob);
+        await instance.registerGame(gId, alice, bob, {from: owner});
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
-        await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
+        await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
     });
 
     it('should allow bob to make a move, but not two moves', async() => {
-        tx = await instance.player2Move(PAPER, {from: bob, value: GameDeposit});
+        tx = await instance.player2Move(gId, PAPER, {from: bob, value: GameDeposit});
         truffleAssert.eventEmitted(tx, 'LogMovePlayer2', evt => {
             return evt.player === bob
                 && evt.gameMove.toString(10) === PAPER.toString(10)
                 && evt.bet.toString(10) === GameDeposit.toString(10);
         });
         await truffleAssert.reverts(
-            instance.player2Move(PAPER, {from: bob, value: GameDeposit}),
+            instance.player2Move(gId, PAPER, {from: bob, value: GameDeposit}),
             "player2 has already made a move"
         );
     });
 
     it('should not allow alice to reclaim funds before expiration period', async() => {
         await truffleAssert.reverts(
-            instance.player1ReclaimFunds({from: alice}),
+            instance.player1ReclaimFunds(gId, {from: alice}),
             "game move not yet expired"
         );
     });
@@ -141,12 +147,14 @@ contract('RockPaperScissors - Given game where alice has commited to a move', (a
     const bob = accounts[5];
     const GameDeposit = web3.utils.toWei('5', 'finney');
     const secretAlice = web3.utils.utf8ToHex("secretForAlice");
+    let gId = null;
 
     before('set up contract and alice commit to a move', async () => {
         instance = await RockPaperScissors.new({from: owner});
-        await instance.registerGame(alice, bob, {from: owner});
+        gId = await instance.generateGameId(alice, bob);
+        await instance.registerGame(gId, alice, bob, {from: owner});
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
-        await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
+        await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
         let snapshot = await tm.takeSnapshot();
         snapshotId = snapshot.result;
     });
@@ -158,7 +166,7 @@ contract('RockPaperScissors - Given game where alice has commited to a move', (a
     it('should allow alice to reclaim funds after move expiration period', async() => {
         let SKIP_FORWARD_PERIOD = 15 * 60; //15 mins
         await tm.advanceTimeAndBlock(SKIP_FORWARD_PERIOD);
-        tx = await instance.player1ReclaimFunds({from: alice});
+        tx = await instance.player1ReclaimFunds(gId, {from: alice});
         truffleAssert.eventEmitted(tx, 'LogPlayer1ReclaimFunds', evt => {
             return evt.player === alice
                 && evt.amount.toString(10) === GameDeposit.toString(10);
@@ -167,7 +175,7 @@ contract('RockPaperScissors - Given game where alice has commited to a move', (a
 
     it('should then not allow bob to make a move', async() => {
         await truffleAssert.reverts(
-            instance.player2Move(PAPER, {from: bob, value: GameDeposit}),
+            instance.player2Move(gId, PAPER, {from: bob, value: GameDeposit}),
             "game deposit not set"
         );
     });
@@ -189,25 +197,27 @@ contract(
     const bob = accounts[5];
     const GameDeposit = web3.utils.toWei('5', 'finney');
     const secretAlice = web3.utils.utf8ToHex("secretForAlice");
+    let gId = null;
 
     beforeEach('set up contract and moves', async() => {
         instance = await RockPaperScissors.new({from: owner});
-        await instance.registerGame(alice, bob, {from: owner});
+        gId = await instance.generateGameId(alice, bob);
+        await instance.registerGame(gId, alice, bob, {from: owner});
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
-        await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
-        await instance.player2Move(PAPER, {from: bob, value: GameDeposit});
+        await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
+        await instance.player2Move(gId, PAPER, {from: bob, value: GameDeposit});
     });
 
     it('should not allow bob to claim funds before reveal expiration', async() => {
         await truffleAssert.reverts(
-            instance.player2ClaimFunds({from: bob}),
+            instance.player2ClaimFunds(gId, {from: bob}),
             "game reveal not yet expired"
         );
     });
 
     it('should not allow bob to make move', async() => {
         await truffleAssert.reverts(
-            instance.player2Move(PAPER, {from: bob, value: GameDeposit}),
+            instance.player2Move(gId, PAPER, {from: bob, value: GameDeposit}),
             "player2 has already made a move"
         );
     });
@@ -215,7 +225,7 @@ contract(
     it('should not allow alice to make commitment to a move', async() => {
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
         await truffleAssert.reverts(
-            instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit}),
+            instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit}),
             "player1 already commited to a move"
         );
     });
@@ -229,13 +239,15 @@ contract(
     const bob = accounts[5];
     const GameDeposit = web3.utils.toWei('5', 'finney');
     const secretAlice = web3.utils.utf8ToHex("secretForAlice");
+    let gId = null;
 
     before('set up contract and moves', async () => {
         instance = await RockPaperScissors.new({from: owner});
-        await instance.registerGame(alice, bob, {from: owner});
+        gId = await instance.generateGameId(alice, bob);
+        await instance.registerGame(gId, alice, bob, {from: owner});
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
-        await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
-        await instance.player2Move(PAPER, {from: bob, value: GameDeposit});
+        await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
+        await instance.player2Move(gId, PAPER, {from: bob, value: GameDeposit});
         let snapshot = await tm.takeSnapshot();
         snapshotId = snapshot.result;
     });
@@ -247,14 +259,14 @@ contract(
     it('should allow bob to claim the funds after reveal expiration period', async() => {
         let SKIP_FORWARD_PERIOD = 15 * 60; //15 mins
         await tm.advanceTimeAndBlock(SKIP_FORWARD_PERIOD);
-        tx = await instance.player2ClaimFunds({from: bob});
+        tx = await instance.player2ClaimFunds(gId, {from: bob});
         truffleAssert.eventEmitted(tx, 'LogPlayer2ClaimFunds', evt => {
             return evt.player === bob
                 && evt.amount.toString(10) === (GameDeposit*2).toString(10);
         });
 
         // Assert that game has been reset
-        let game = await instance.game();
+        let game = await instance.games(gId);
         assert.equal(game.player1, 0);
         assert.equal(game.player2, 0);
         assert.equal(game.gameMove2.toString(10), '0');
@@ -280,17 +292,19 @@ contract(
     const bob = accounts[5];
     const GameDeposit = web3.utils.toWei('5', 'finney');
     const secretAlice = web3.utils.utf8ToHex("secretForAlice");
+    let gId = null;
     
     beforeEach('set up contract and moves', async () => {
         instance = await RockPaperScissors.new({from: owner});
-        await instance.registerGame(alice, bob, {from: owner});
+        gId = await instance.generateGameId(alice, bob);
+        await instance.registerGame(gId, alice, bob, {from: owner});
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
-        await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
-        await instance.player2Move(PAPER, {from: bob, value: GameDeposit});
+        await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
+        await instance.player2Move(gId, PAPER, {from: bob, value: GameDeposit});
     });
     
     it('should allow alice to reveal move', async() => {
-        tx = await instance.player1MoveReveal(ROCK, secretAlice, {from: alice});
+        tx = await instance.player1MoveReveal(gId, ROCK, secretAlice, {from: alice});
         truffleAssert.eventEmitted(tx, 'LogMoveReveal', evt => {
             return evt.player === alice 
                 && evt.gameMove.toString(10) === ROCK.toString(10);
@@ -298,7 +312,7 @@ contract(
     });
 
     it('should allow alice reveal move and bob to claim winnings', async() => {
-        tx = await instance.player1MoveReveal(ROCK, secretAlice, {from: alice});
+        tx = await instance.player1MoveReveal(gId, ROCK, secretAlice, {from: alice});
         truffleAssert.eventEmitted(tx, 'LogMoveReveal', evt => {
             return evt.player === alice 
                 && evt.gameMove.toString(10) === ROCK.toString(10);
@@ -326,7 +340,7 @@ contract(
         assert.isTrue(bobBalanceAfter.eq(bobBalanceBefore.add(amountWon).sub(gasCost)));
 
         // Assert that game has been reset
-        let game = await instance.game();
+        let game = await instance.games(gId);
         assert.equal(game.player1, 0);
         assert.equal(game.player2, 0);
         assert.equal(game.gameMove2.toString(10), '0');
@@ -344,17 +358,19 @@ contract(
     const bob = accounts[5];
     const GameDeposit = web3.utils.toWei('5', 'finney');
     const secretAlice = web3.utils.utf8ToHex("secretForAlice");
+    let gId = null;
     
     beforeEach('set up contract and moves', async () => {
         instance = await RockPaperScissors.new({from: owner});
-        await instance.registerGame(alice, bob, {from: owner});
+        gId = await instance.generateGameId(alice, bob);
+        await instance.registerGame(gId, alice, bob, {from: owner});
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
-        await instance.player1MoveCommit(commitment, {from: alice, value: GameDeposit});
-        await instance.player2Move(ROCK, {from: bob, value: GameDeposit});
+        await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
+        await instance.player2Move(gId, ROCK, {from: bob, value: GameDeposit});
     });
     
     it('should allow alice to reveal move', async() => {
-        tx = await instance.player1MoveReveal(ROCK, secretAlice, {from: alice});
+        tx = await instance.player1MoveReveal(gId, ROCK, secretAlice, {from: alice});
         truffleAssert.eventEmitted(tx, 'LogMoveReveal', evt => {
             return evt.player === alice 
                 && evt.gameMove.toString(10) === ROCK.toString(10);
@@ -362,7 +378,7 @@ contract(
     });
 
     it('should allow alice reveal move and then both alice and bob to claim winnings', async() => {
-        tx = await instance.player1MoveReveal(ROCK, secretAlice, {from: alice});
+        tx = await instance.player1MoveReveal(gId, ROCK, secretAlice, {from: alice});
         truffleAssert.eventEmitted(tx, 'LogMoveReveal', evt => {
             return evt.player === alice 
                 && evt.gameMove.toString(10) === ROCK.toString(10);
@@ -390,7 +406,7 @@ contract(
         });
 
         // Assert that game has been reset
-        let game = await instance.game();
+        let game = await instance.games(gId);
         assert.equal(game.player1, 0);
         assert.equal(game.player2, 0);
         assert.equal(game.gameMove2.toString(10), '0');
