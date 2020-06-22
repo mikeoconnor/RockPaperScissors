@@ -12,51 +12,19 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
     const owner = accounts[0];
     const alice = accounts[4];
     const bob = accounts[5];
-
-    beforeEach('set up contract', async() => {
-        instance = await RockPaperScissors.new({from: owner});
-    });
-
-    it('should allow alice and bob to register', async() => {
-        let gId = await instance.generateGameId(alice, bob);
-        tx = await instance.registerGame(gId, alice, bob, {from: owner});
-        truffleAssert.eventEmitted(tx, 'LogGameCreation', evt => {
-            return evt.player1 === alice
-                && evt.player2 === bob
-                && evt.gameId === gId;
-        });
-
-    });
-
-    it('should not allow same player to register twice', async() => {
-        let gId = await instance.generateGameId(alice, bob);
-        await truffleAssert.reverts(
-            instance.registerGame(gId, bob, bob, {from: owner}),
-            "player1 equals player2"
-        );
-    });
-});
-
-contract('RockPaperScissors - Given new contract', (accounts) => {
-    const owner = accounts[0];
-    const alice = accounts[4];
-    const bob = accounts[5];
     const GameDeposit = web3.utils.toWei('5', 'finney');
     const secretAlice = web3.utils.utf8ToHex("secretForAlice");
-    let gId = null;
     
     beforeEach('set up contract', async () => {
         instance = await RockPaperScissors.new({from: owner});
-        gId = await instance.generateGameId(alice, bob);
-        await instance.registerGame(gId, alice, bob, {from: owner});
     });
     
     it('should allow allice (player1) to commit to a move', async() => {
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
-        tx = await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
+        tx = await instance.player1MoveCommit(commitment, bob, {from: alice, value: GameDeposit});
         truffleAssert.eventEmitted(tx, 'LogMoveCommitPlayer1', evt => {
-            return evt.player === alice
-                && evt.gameId === gId
+            return evt.player1 === alice
+                && evt.player2 === bob
                 && evt.commitment === commitment
                 && evt.bet.toString(10) === GameDeposit.toString(10);
         });
@@ -65,6 +33,7 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
     });
     
     it('should not allow bob (player2) to make a move', async() => {
+        let gId = await instance.generateCommitment(PAPER, web3.utils.utf8ToHex("bob's secret"));
         await truffleAssert.reverts(
             instance.player2Move(gId, PAPER, {from: bob, value: GameDeposit}),
             "game deposit not set"
@@ -74,10 +43,11 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
     it ('should allow alice to commit to a move and then bob to make a move', async() => {
         // Alice game move commitment
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
-        tx = await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
+        let gId = commitment;
+        tx = await instance.player1MoveCommit(commitment, bob, {from: alice, value: GameDeposit});
         truffleAssert.eventEmitted(tx, 'LogMoveCommitPlayer1', evt => {
-            return evt.player === alice
-                && evt.gameId === gId
+            return evt.player1 === alice
+                && evt.player2 === bob
                 && evt.commitment === commitment
                 && evt.bet.toString(10) === GameDeposit.toString(10);
         });
@@ -94,16 +64,17 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
     
     it('should not allow alice to commit twice', async() => {
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
-        tx = await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
+        let gId = commitment;
+        tx = await instance.player1MoveCommit(commitment, bob, {from: alice, value: GameDeposit});
         truffleAssert.eventEmitted(tx, 'LogMoveCommitPlayer1', evt => {
-            return evt.player === alice
-                && evt.gameId === gId
+            return evt.player1 === alice
+                && evt.player2 === bob
                 && evt.commitment === commitment
                 && evt.bet.toString(10) === GameDeposit.toString(10);
         });
         await truffleAssert.reverts(
-            instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit}),
-            "player1 already commited to a move"
+            instance.player1MoveCommit(commitment, bob, {from: alice, value: GameDeposit}),
+            "game id already used"
         );
     });
 });
@@ -118,10 +89,9 @@ contract('RockPaperScissors - Given game where alice has commited to a move', (a
 
     beforeEach('set up contract and alice commit to a move', async () => {
         instance = await RockPaperScissors.new({from: owner});
-        gId = await instance.generateGameId(alice, bob);
-        await instance.registerGame(gId, alice, bob, {from: owner});
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
-        await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
+        gId = commitment;
+        await instance.player1MoveCommit(commitment, bob, {from: alice, value: GameDeposit});
     });
 
     it('should allow bob to make a move, but not two moves', async() => {
@@ -157,10 +127,9 @@ contract('RockPaperScissors - Given game where alice has commited to a move', (a
 
     before('set up contract and alice commit to a move', async () => {
         instance = await RockPaperScissors.new({from: owner});
-        gId = await instance.generateGameId(alice, bob);
-        await instance.registerGame(gId, alice, bob, {from: owner});
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
-        await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
+        gId = commitment;
+        await instance.player1MoveCommit(commitment, bob, {from: alice, value: GameDeposit});
         let snapshot = await tm.takeSnapshot();
         snapshotId = snapshot.result;
     });
@@ -208,10 +177,9 @@ contract(
 
     beforeEach('set up contract and moves', async() => {
         instance = await RockPaperScissors.new({from: owner});
-        gId = await instance.generateGameId(alice, bob);
-        await instance.registerGame(gId, alice, bob, {from: owner});
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
-        await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
+        gId = commitment;
+        await instance.player1MoveCommit(commitment, bob, {from: alice, value: GameDeposit});
         await instance.player2Move(gId, PAPER, {from: bob, value: GameDeposit});
     });
 
@@ -232,8 +200,8 @@ contract(
     it('should not allow alice to make commitment to a move', async() => {
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
         await truffleAssert.reverts(
-            instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit}),
-            "player1 already commited to a move"
+            instance.player1MoveCommit(commitment, bob, {from: alice, value: GameDeposit}),
+            "game id already used"
         );
     });
 });
@@ -250,10 +218,9 @@ contract(
 
     before('set up contract and moves', async () => {
         instance = await RockPaperScissors.new({from: owner});
-        gId = await instance.generateGameId(alice, bob);
-        await instance.registerGame(gId, alice, bob, {from: owner});
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
-        await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
+        gId = commitment;
+        await instance.player1MoveCommit(commitment, bob, {from: alice, value: GameDeposit});
         await instance.player2Move(gId, PAPER, {from: bob, value: GameDeposit});
         let snapshot = await tm.takeSnapshot();
         snapshotId = snapshot.result;
@@ -278,7 +245,6 @@ contract(
         assert.equal(game.player1, 0);
         assert.equal(game.player2, 0);
         assert.equal(game.gameMove2.toString(10), '0');
-        assert.equal(game.commitment1, 0);
         assert.equal(game.gameDeposit, 0);
         assert.equal(game.expiration, 0);
     });
@@ -304,10 +270,9 @@ contract(
     
     beforeEach('set up contract and moves', async () => {
         instance = await RockPaperScissors.new({from: owner});
-        gId = await instance.generateGameId(alice, bob);
-        await instance.registerGame(gId, alice, bob, {from: owner});
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
-        await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
+        gId = commitment;
+        await instance.player1MoveCommit(commitment, bob, {from: alice, value: GameDeposit});
         await instance.player2Move(gId, PAPER, {from: bob, value: GameDeposit});
     });
     
@@ -355,7 +320,6 @@ contract(
         assert.equal(game.player1, 0);
         assert.equal(game.player2, 0);
         assert.equal(game.gameMove2.toString(10), '0');
-        assert.equal(game.commitment1, 0);
         assert.equal(game.gameDeposit, 0);
         assert.equal(game.expiration, 0);
     });
@@ -373,10 +337,9 @@ contract(
     
     beforeEach('set up contract and moves', async () => {
         instance = await RockPaperScissors.new({from: owner});
-        gId = await instance.generateGameId(alice, bob);
-        await instance.registerGame(gId, alice, bob, {from: owner});
         let commitment = await instance.generateCommitment(ROCK, secretAlice);
-        await instance.player1MoveCommit(gId, commitment, {from: alice, value: GameDeposit});
+        gId = commitment;
+        await instance.player1MoveCommit(commitment, bob, {from: alice, value: GameDeposit});
         await instance.player2Move(gId, ROCK, {from: bob, value: GameDeposit});
     });
     
@@ -424,7 +387,6 @@ contract(
         assert.equal(game.player1, 0);
         assert.equal(game.player2, 0);
         assert.equal(game.gameMove2.toString(10), '0');
-        assert.equal(game.commitment1, 0);
         assert.equal(game.gameDeposit, 0);
         assert.equal(game.expiration, 0);
     });
@@ -445,15 +407,13 @@ contract(
 
     before('set up contract and moves', async () => {
         instance = await RockPaperScissors.new({from: owner});
-        gId1 = await instance.generateGameId(alice, bob);
-        gId2 = await instance.generateGameId(alice, carol);
-        await instance.registerGame(gId1, alice, bob, {from: owner});
-        await instance.registerGame(gId2, alice, carol, {from: owner});
         let commitment = await instance.generateCommitment(PAPER, secretAlice);
-        await instance.player1MoveCommit(gId1, commitment, {from: alice, value: GameDeposit});
+        gId1 = commitment;
+        await instance.player1MoveCommit(commitment, bob, {from: alice, value: GameDeposit});
         await instance.player2Move(gId1, ROCK, {from: bob, value: GameDeposit});
         commitment = await instance.generateCommitment(PAPER, secretAlice2);
-        await instance.player1MoveCommit(gId2, commitment, {from: alice, value: GameDeposit});
+        gId2 = commitment;
+        await instance.player1MoveCommit(commitment, carol, {from: alice, value: GameDeposit});
         await instance.player2Move(gId2, ROCK, {from: carol, value: GameDeposit});
     });
 
@@ -477,7 +437,6 @@ contract(
         assert.equal(game.player1, 0);
         assert.equal(game.player2, 0);
         assert.equal(game.gameMove2.toString(10), '0');
-        assert.equal(game.commitment1, 0);
         assert.equal(game.gameDeposit, 0);
         assert.equal(game.expiration, 0);
     });
@@ -502,7 +461,6 @@ contract(
         assert.equal(game.player1, 0);
         assert.equal(game.player2, 0);
         assert.equal(game.gameMove2.toString(10), '0');
-        assert.equal(game.commitment1, 0);
         assert.equal(game.gameDeposit, 0);
         assert.equal(game.expiration, 0);
     });
