@@ -38,7 +38,6 @@ contract RockPaperScissors is Stoppable {
     struct GameDetailsStruct {
         address player1;
         address player2;
-        bytes32 commitment1;
         GameMoves gameMove2;
         uint256 gameDeposit;
         uint256 expiration;
@@ -46,7 +45,12 @@ contract RockPaperScissors is Stoppable {
 
     mapping(address => uint256) public balances;
 
+    // mapping of commitment to game, i.e. 'game id' is
+    // equal to commitment submitted by player1
     mapping(bytes32 => GameDetailsStruct) public games;
+
+    // Record of 'game ids' (commitments) used by the different games
+    mapping(bytes32 => bool) public gameIds;
 
     // Wait for a period of 10 mins
     uint256 public constant WAITPERIOD = 600;
@@ -61,28 +65,15 @@ contract RockPaperScissors is Stoppable {
     }
 
     /**
-     * @dev Log that RockPaperScissors contract has been created with two
-     * players.
-     * @param player1 - the first game player.
-     * @param player2 - the second game player.
-     * @param gameId - the game ID.
-     */
-    event LogGameCreation(
-        address indexed player1,
-        address indexed player2,
-        bytes32 indexed gameId
-    );
-
-    /**
      * @dev Log that first player (player1) has commited to a move.
-     * @param player - address of player commiting move.
-     * @param gameId - the game ID.
+     * @param player1 - address of first player commiting move.
+     * @param player2 - the address of second player.
      * @param commitment - cryptographic hash of committed move.
      * @param bet - the amount of wei player spent to play move.
      */
     event LogMoveCommitPlayer1(
-        address indexed player,
-        bytes32 indexed gameId,
+        address indexed player1,
+        address indexed player2,
         bytes32 indexed commitment,
         uint256 bet
     );
@@ -174,53 +165,6 @@ contract RockPaperScissors is Stoppable {
     );
 
     /**
-     * @dev This function registers the players for a game.
-     * @param _gameId - the game ID.
-     * @param _player1 - the first player.
-     * @param _player2 - the second player.
-     * @return true if successful, false otherwise.
-     * Emits event: LogGameCreation.
-     */
-    function registerGame(bytes32 _gameId, address _player1, address _player2)
-        public
-        ifAlive
-        ifRunning
-        returns (bool success)
-    {
-        require(_gameId != 0, "invalid game Id");
-        require(_player1 != address(0), "invalid address for player1");
-        require(_player2 != address(0), "invalid address for player2");
-        require(_player1 != _player2, "player1 equals player2");
-        require(
-            games[_gameId].player1 == address(0),
-            "player1 already exists"
-        );
-        require(
-            games[_gameId].player2 == address(0),
-            "player2 already exists"
-        );
-        games[_gameId].player1 = _player1;
-        games[_gameId].player2 = _player2;
-        emit LogGameCreation(_player1, _player2, _gameId);
-        return true;
-    }
-
-    /**
-     * @dev This function generates a game ID that is unique to a particular
-     * game.
-     * @param _player1 - the address of the first player.
-     * @param _player2 - the address of the second player.
-     * @return The game ID.
-     */
-    function generateGameId(address _player1, address _player2)
-        public
-        pure
-        returns (bytes32 gameId)
-    {
-        return keccak256(abi.encode(_player1, _player2));
-    }
-
-    /**
      * @dev Generate a commitment (crytographic hash of game move).
      * @param _gameMove - the game move.
      * @param secret - secert phrase that is unique to each player and only
@@ -237,34 +181,33 @@ contract RockPaperScissors is Stoppable {
     }
 
     /**
-     * @dev This function records the game move of the first player (player1)
-     * as a commitment (cryptographic hash of game move). Player1 also
-     * determines the game deposite (the funds that player2 will have to
-     * deposit to play the game).
-     * @param _gameId - the game ID.
+     * @dev This function starts a particulate game by registering both
+     * of the addresses of the first and second players. It then records the
+     * game move of the first player (player1) as a commitment (cryptographic
+     * hash of game move). Player1 also determines the game deposite (the funds
+     * that player2 will have to deposit to play the game).
      * @param _commitment - Cryptographic hash of player's move.
+     * @param _player2 - the address of second player.
      * @return true if successfull, false otherwise.
      * Emits event: LogMoveCommitPlayer1.
      */
-    function player1MoveCommit(bytes32 _gameId, bytes32 _commitment)
+    function player1MoveCommit(bytes32 _commitment, address _player2)
         public
         payable
         ifAlive
         ifRunning
         returns (bool success)
     {
-        require(_gameId != 0, "invalid game Id");
         require(_commitment != 0, "commitment should be non zero");
-        require(games[_gameId].player1 == msg.sender, "incorrect player");
+        require(!gameIds[_commitment], "game id already used");
         require(msg.value != 0, "a game deposit is required");
-        require(
-            games[_gameId].commitment1 == 0,
-            "player1 already commited to a move"
-        );
-        games[_gameId].commitment1 = _commitment;
-        games[_gameId].gameDeposit = msg.value;
-        games[_gameId].expiration = now + WAITPERIOD;
-        emit LogMoveCommitPlayer1(msg.sender, _gameId, _commitment, msg.value);
+        require(_player2 != msg.sender, "both players cannot be the same");
+        gameIds[_commitment] = true;
+        games[_commitment].player1 = msg.sender;
+        games[_commitment].player2 = _player2;
+        games[_commitment].gameDeposit = msg.value;
+        games[_commitment].expiration = now + WAITPERIOD;
+        emit LogMoveCommitPlayer1(msg.sender, _player2, _commitment, msg.value);
         return true;
     }
 
@@ -328,7 +271,7 @@ contract RockPaperScissors is Stoppable {
         require(_gameId != 0, "invalid game Id");
         require(games[_gameId].player1 == msg.sender, "incorrect player1");
         require(
-            games[_gameId].commitment1 == generateCommitment(_gameMove1, secret),
+            _gameId == generateCommitment(_gameMove1, secret),
             "failed to verify commitment"
         );
         emit LogMoveReveal(msg.sender, _gameId, _gameMove1);
@@ -393,7 +336,6 @@ contract RockPaperScissors is Stoppable {
         games[_gameId].player1 = address(0);
         games[_gameId].player2 = address(0);
         games[_gameId].gameMove2 = GameMoves(0);
-        games[_gameId].commitment1 = 0;
         games[_gameId].gameDeposit = 0;
         games[_gameId].expiration = 0;
     }
@@ -463,7 +405,6 @@ contract RockPaperScissors is Stoppable {
         //reset game
         games[_gameId].player1 = address(0);
         games[_gameId].player2 = address(0);
-        games[_gameId].commitment1 = 0;
         games[_gameId].gameDeposit = 0;
         games[_gameId].expiration = 0;
         return true;
@@ -486,10 +427,6 @@ contract RockPaperScissors is Stoppable {
         require(_gameId != 0, "invalid game Id");
         require(games[_gameId].player2 == msg.sender, "incorrect player");
         require(
-            games[_gameId].commitment1 != 0,
-            "player1 has not commited to a move"
-        );
-        require(
             now > games[_gameId].expiration,
             "game reveal not yet expired"
         );
@@ -504,7 +441,6 @@ contract RockPaperScissors is Stoppable {
         //reset game
         games[_gameId].player1 = address(0);
         games[_gameId].player2 = address(0);
-        games[_gameId].commitment1 = 0;
         games[_gameId].gameMove2 = GameMoves(0);
         games[_gameId].gameDeposit = 0;
         games[_gameId].expiration = 0;
