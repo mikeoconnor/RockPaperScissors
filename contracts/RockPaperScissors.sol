@@ -49,9 +49,6 @@ contract RockPaperScissors is Stoppable {
     // equal to commitment submitted by player1
     mapping(bytes32 => GameDetailsStruct) public games;
 
-    // Record of 'game ids' (commitments) used by the different games
-    mapping(bytes32 => bool) public gameIds;
-
     // Wait for a period of 10 mins
     uint256 public constant WAITPERIOD = 600;
 
@@ -199,10 +196,9 @@ contract RockPaperScissors is Stoppable {
         returns (bool success)
     {
         require(_commitment != 0, "commitment should be non zero");
-        require(!gameIds[_commitment], "game id already used");
+        require(games[_commitment].player1 == address(0), "game id already used");
         require(msg.value != 0, "a game deposit is required");
         require(_player2 != msg.sender, "both players cannot be the same");
-        gameIds[_commitment] = true;
         games[_commitment].player1 = msg.sender;
         games[_commitment].player2 = _player2;
         games[_commitment].gameDeposit = msg.value;
@@ -333,7 +329,6 @@ contract RockPaperScissors is Stoppable {
         }
 
         // reset game
-        games[_gameId].player1 = address(0);
         games[_gameId].player2 = address(0);
         games[_gameId].gameMove2 = GameMoves(0);
         games[_gameId].gameDeposit = 0;
@@ -403,7 +398,6 @@ contract RockPaperScissors is Stoppable {
         );
 
         //reset game
-        games[_gameId].player1 = address(0);
         games[_gameId].player2 = address(0);
         games[_gameId].gameDeposit = 0;
         games[_gameId].expiration = 0;
@@ -440,7 +434,6 @@ contract RockPaperScissors is Stoppable {
         );
 
         //reset game
-        games[_gameId].player1 = address(0);
         games[_gameId].player2 = address(0);
         games[_gameId].gameMove2 = GameMoves(0);
         games[_gameId].gameDeposit = 0;

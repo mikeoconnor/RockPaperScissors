@@ -280,7 +280,6 @@ contract(
 
         // Assert that game has been reset
         let game = await instance.games(gId);
-        assert.equal(game.player1, 0);
         assert.equal(game.player2, 0);
         assert.equal(game.gameMove2.toString(10), '0');
         assert.equal(game.gameDeposit, 0);
@@ -355,7 +354,6 @@ contract(
 
         // Assert that game has been reset
         let game = await instance.games(gId);
-        assert.equal(game.player1, 0);
         assert.equal(game.player2, 0);
         assert.equal(game.gameMove2.toString(10), '0');
         assert.equal(game.gameDeposit, 0);
@@ -422,7 +420,6 @@ contract(
 
         // Assert that game has been reset
         let game = await instance.games(gId);
-        assert.equal(game.player1, 0);
         assert.equal(game.player2, 0);
         assert.equal(game.gameMove2.toString(10), '0');
         assert.equal(game.gameDeposit, 0);
@@ -472,7 +469,6 @@ contract(
 
         // Assert that game1 has been reset
         let game = await instance.games(gId1);
-        assert.equal(game.player1, 0);
         assert.equal(game.player2, 0);
         assert.equal(game.gameMove2.toString(10), '0');
         assert.equal(game.gameDeposit, 0);
@@ -496,7 +492,6 @@ contract(
 
         // Assert that game2 has been reset
         let game = await instance.games(gId2);
-        assert.equal(game.player1, 0);
         assert.equal(game.player2, 0);
         assert.equal(game.gameMove2.toString(10), '0');
         assert.equal(game.gameDeposit, 0);
