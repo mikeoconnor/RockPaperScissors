@@ -228,6 +228,13 @@ contract(
         );
     });
 
+    it('should not allow alice to reclaim funds', async() => {
+        await truffleAssert.reverts(
+            instance.player1ReclaimFunds(gId, {from: alice}),
+            "player2 has made a move"
+        );
+    });
+
     it('should not allow bob to make move', async() => {
         await truffleAssert.reverts(
             instance.player2Move(gId, PAPER, {from: bob, value: GameDeposit}),
@@ -322,6 +329,13 @@ contract(
         });
     });
 
+    it('should not allow alice to reclaim funds', async() => {
+        await truffleAssert.reverts(
+            instance.player1ReclaimFunds(gId, {from: alice}),
+            "player2 has made a move"
+        );
+    });
+
     it('should allow alice reveal move and bob to claim winnings', async() => {
         tx = await instance.player1MoveReveal(gId, ROCK, secretAlice, {from: alice});
         truffleAssert.eventEmitted(tx, 'LogMoveReveal', evt => {
@@ -386,6 +400,13 @@ contract(
                 && evt.gameId === gId
                 && evt.gameMove.toString(10) === ROCK.toString(10);
         });
+    });
+
+    it('should not allow alice to reclaim funds', async() => {
+        await truffleAssert.reverts(
+            instance.player1ReclaimFunds(gId, {from: alice}),
+            "player2 has made a move"
+        );
     });
 
     it('should allow alice reveal move and then both alice and bob to claim winnings', async() => {
