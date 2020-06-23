@@ -270,6 +270,7 @@ contract RockPaperScissors is Stoppable {
     {
         require(_gameId != 0, "invalid game Id");
         require(games[_gameId].player1 == msg.sender, "incorrect player1");
+        require(games[_gameId].gameMove2 != GameMoves.None, "player2 has not made a move");
         require(
             _gameId == generateCommitment(_gameMove1, secret),
             "failed to verify commitment"
