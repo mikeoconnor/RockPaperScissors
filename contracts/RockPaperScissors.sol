@@ -388,6 +388,7 @@ contract RockPaperScissors is Stoppable {
             games[_gameId].gameMove2 == GameMoves.None,
             "player2 has made a move"
         );
+        require(games[_gameId].gameDeposit != 0, "no funds");
         require(now > games[_gameId].expiration, "game move not yet expired");
         balances[games[_gameId].player1] = balances[games[_gameId].player1]
             .add(games[_gameId].gameDeposit);

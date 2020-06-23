@@ -445,6 +445,18 @@ contract(
         assert.equal(game.gameMove2.toString(10), '0');
         assert.equal(game.gameDeposit, 0);
         assert.equal(game.expiration, 0);
+
+        // alice should not be allowed to reclaim funds
+        await truffleAssert.reverts(
+            instance.player1ReclaimFunds(gId, {from: alice}),
+            "no funds"
+        );
+
+        // bob should not be allowed to claim funds
+        await truffleAssert.reverts(
+            instance.player2ClaimFunds(gId, {from: bob}),
+            "incorrect player"
+        );
     });
 });
 
