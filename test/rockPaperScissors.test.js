@@ -115,6 +115,13 @@ contract('RockPaperScissors - Given game where alice has commited to a move', (a
         );
     });
 
+    it('should not allow alice to reveal move', async() => {
+        await truffleAssert.reverts(
+            instance.player1MoveReveal(gId, ROCK, secretAlice, {from: alice}),
+            "player2 has not made a move"
+        );
+    });
+
 });
 
 contract('RockPaperScissors - Given game where alice has commited to a move', (accounts) => {
