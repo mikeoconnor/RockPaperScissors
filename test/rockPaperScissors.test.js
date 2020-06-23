@@ -36,7 +36,7 @@ contract('RockPaperScissors - Given new contract', (accounts) => {
         let gId = await instance.generateCommitment(PAPER, web3.utils.utf8ToHex("bob's secret"));
         await truffleAssert.reverts(
             instance.player2Move(gId, PAPER, {from: bob, value: GameDeposit}),
-            "game deposit not set"
+            "incorrect player"
         );
     });
     
@@ -159,7 +159,7 @@ contract('RockPaperScissors - Given game where alice has commited to a move', (a
     it('should then not allow bob to make a move', async() => {
         await truffleAssert.reverts(
             instance.player2Move(gId, PAPER, {from: bob, value: GameDeposit}),
-            "game deposit not set"
+            "incorrect player"
         );
     });
 

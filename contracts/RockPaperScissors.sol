@@ -229,7 +229,6 @@ contract RockPaperScissors is Stoppable {
         returns (bool success)
     {
         require(_gameId != 0, "invalid game Id");
-        require(games[_gameId].gameDeposit > 0, "game deposit not set");
         require(games[_gameId].player2 == msg.sender, "incorrect player");
         require(
             msg.value == games[_gameId].gameDeposit,
