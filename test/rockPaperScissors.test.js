@@ -165,6 +165,37 @@ contract('RockPaperScissors - Given game where alice has commited to a move', (a
     });
 });
 
+contract('RockPaperScissors - Given game where alice has commited to a move', (accounts) => {
+    const owner = accounts[0];
+    const alice = accounts[4];
+    const bob = accounts[5];
+    const GameDeposit = web3.utils.toWei('5', 'finney');
+    const secretAlice = web3.utils.utf8ToHex("secretForAlice");
+    let gId = null;
+
+    before('set up contract and alice commit to a move', async () => {
+        instance = await RockPaperScissors.new({from: owner});
+        let commitment = await instance.generateCommitment(ROCK, secretAlice);
+        gId = commitment;
+        await instance.player1MoveCommit(commitment, bob, {from: alice, value: GameDeposit});
+        let snapshot = await tm.takeSnapshot();
+        snapshotId = snapshot.result;
+    });
+
+    after(async() => {
+        await tm.revertToSnapshot(snapshotId);
+    });
+
+    it('should not allow bob to reclaim funds after expiration', async() => {
+        let SKIP_FORWARD_PERIOD = 15 * 60; //15 mins
+        await tm.advanceTimeAndBlock(SKIP_FORWARD_PERIOD);
+        await truffleAssert.reverts(
+            instance.player2ClaimFunds(gId, {from: bob}),
+            "player2 has not made a move"
+        );
+    });
+});
+
 contract(
     'RockPaperScissors - Given game where alice has commited to a move and then bob has made a move',
     (accounts) => {
