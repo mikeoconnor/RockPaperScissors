@@ -202,7 +202,7 @@ contract RockPaperScissors is Stoppable {
         games[_commitment].player1 = msg.sender;
         games[_commitment].player2 = _player2;
         games[_commitment].gameDeposit = msg.value;
-        games[_commitment].expiration = now + WAITPERIOD;
+        games[_commitment].expiration = now.add(WAITPERIOD);
         emit LogMoveCommitPlayer1(msg.sender, _player2, _commitment, msg.value);
         return true;
     }
@@ -235,7 +235,7 @@ contract RockPaperScissors is Stoppable {
             "player2 has already made a move"
         );
         games[_gameId].gameMove2 = _gameMove;
-        games[_gameId].expiration = now + WAITPERIOD;
+        games[_gameId].expiration = now.add(WAITPERIOD);
         emit LogMovePlayer2(msg.sender, _gameId, _gameMove, msg.value);
         return true;
     }
