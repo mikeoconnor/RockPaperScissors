@@ -265,13 +265,14 @@ contract RockPaperScissors is Stoppable {
     {
         require(_gameId != 0, "invalid game Id");
         require(games[_gameId].player1 == msg.sender, "incorrect player1");
-        require(games[_gameId].gameMove2 != GameMoves.None, "player2 has not made a move");
+        GameMoves gameMove2 = games[_gameId].gameMove2;
+        require(gameMove2 != GameMoves.None, "player2 has not made a move");
         require(
             _gameId == generateCommitment(_gameMove1, secret),
             "failed to verify commitment"
         );
         emit LogMoveReveal(msg.sender, _gameId, _gameMove1);
-        determineGameResult(_gameId, _gameMove1, games[_gameId].gameMove2);
+        determineGameResult(_gameId, _gameMove1, gameMove2);
         return true;
     }
 
@@ -294,36 +295,39 @@ contract RockPaperScissors is Stoppable {
         moveIsValid(_gameMove2)
     {
         uint8 idx = gameWinner(_gameMove1, _gameMove2);
+        uint256 deposit = games[_gameId].gameDeposit;
+        address player1 = games[_gameId].player1;
+        address player2 = games[_gameId].player2;
         if (idx == 0) {
             // player1 wins the game
             emit LogGameWinner(
-                games[_gameId].player1,
+                player1,
                 _gameId,
-                games[_gameId].gameDeposit.mul(2)
+                deposit.mul(2)
             );
-            balances[games[_gameId].player1] = balances[games[_gameId].player1]
-                .add(games[_gameId].gameDeposit.mul(2));
+            balances[player1] = balances[player1]
+                .add(deposit.mul(2));
         } else if (idx == 1) {
             // player2 wins the game
             emit LogGameWinner(
-                games[_gameId].player2,
+                player2,
                 _gameId,
-                games[_gameId].gameDeposit.mul(2)
+                deposit.mul(2)
             );
-            balances[games[_gameId].player2] = balances[games[_gameId].player2]
-                .add(games[_gameId].gameDeposit.mul(2));
+            balances[player2] = balances[player2]
+                .add(deposit.mul(2));
         } else if (idx == 2) {
             // player1 and player2 draw the game
             emit LogGameDraw(
-                games[_gameId].player1,
-                games[_gameId].player2,
+                player1,
+                player2,
                 _gameId,
-                games[_gameId].gameDeposit
+                deposit
             );
-            balances[games[_gameId].player1] = balances[games[_gameId].player1]
-                .add(games[_gameId].gameDeposit);
-            balances[games[_gameId].player2] = balances[games[_gameId].player2]
-                .add(games[_gameId].gameDeposit);
+            balances[player1] = balances[player1]
+                .add(deposit);
+            balances[player2] = balances[player2]
+                .add(deposit);
         } else {
             require(false, "unexpected winner index");
         }
