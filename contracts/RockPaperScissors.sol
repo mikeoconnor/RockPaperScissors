@@ -296,16 +296,15 @@ contract RockPaperScissors is Stoppable {
     {
         uint8 idx = gameWinner(_gameMove1, _gameMove2);
         uint256 deposit = games[_gameId].gameDeposit;
-        address player1 = games[_gameId].player1;
         address player2 = games[_gameId].player2;
         if (idx == 0) {
             // player1 wins the game
             emit LogGameWinner(
-                player1,
+                msg.sender,
                 _gameId,
                 deposit.mul(2)
             );
-            balances[player1] = balances[player1]
+            balances[msg.sender] = balances[msg.sender]
                 .add(deposit.mul(2));
         } else if (idx == 1) {
             // player2 wins the game
@@ -319,12 +318,12 @@ contract RockPaperScissors is Stoppable {
         } else if (idx == 2) {
             // player1 and player2 draw the game
             emit LogGameDraw(
-                player1,
+                msg.sender,
                 player2,
                 _gameId,
                 deposit
             );
-            balances[player1] = balances[player1]
+            balances[msg.sender] = balances[msg.sender]
                 .add(deposit);
             balances[player2] = balances[player2]
                 .add(deposit);
