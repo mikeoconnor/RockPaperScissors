@@ -355,20 +355,15 @@ contract RockPaperScissors is Stoppable {
     {
         if (gameMove0 == gameMove1) {
             index = 2;
-        } else if (
-            (gameMove0 == GameMoves.Rock && gameMove1 == GameMoves.Scissors)
-            || (gameMove0 == GameMoves.Paper && gameMove1 == GameMoves.Rock)
-            || (gameMove0 == GameMoves.Scissors && gameMove1 == GameMoves.Paper)
-        ) {
-            index = 0;
-        } else if (
-            (gameMove0 == GameMoves.Rock && gameMove1 == GameMoves.Paper)
-            || (gameMove0 == GameMoves.Paper && gameMove1 == GameMoves.Scissors)
-            || (gameMove0 == GameMoves.Scissors && gameMove1 == GameMoves.Rock)
-        ) {
-            index = 1;
         } else {
-            require(false, "unexpected game result");
+            uint gameResult = (uint(gameMove0).add(2)).sub(uint(gameMove1));
+            if (gameResult == 0 || gameResult == 3) {
+                index = 0;
+            } else if (gameResult == 1 || gameResult == 4) {
+                index = 1;
+            } else {
+                require(false, "unexpected game result");
+            }
         }
     }
 
