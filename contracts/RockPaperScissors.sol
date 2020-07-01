@@ -330,18 +330,7 @@ contract RockPaperScissors is Stoppable {
         moveIsValid(gameMove1)
         returns (uint8 index)
     {
-        if (gameMove0 == gameMove1) {
-            index = 2;
-        } else {
-            uint gameResult = (uint(gameMove0).add(2)).sub(uint(gameMove1)) % 3;
-            if (gameResult == 0) {
-                index = 0;
-            } else if (gameResult == 1) {
-                index = 1;
-            } else {
-                require(false, "unexpected game result");
-            }
-        }
+        index = uint8((uint(gameMove0).add(2)).sub(uint(gameMove1)) % 3);
     }
 
     /**
