@@ -313,6 +313,13 @@ contract(
                 && evt.gameId === gId
                 && evt.gameMove.toString(10) === ROCK.toString(10);
         });
+
+        // bob wins game because PAPER beats ROCK
+        truffleAssert.eventEmitted(tx, 'LogGameWinner', evt => {
+            return evt.player === bob
+                && evt.gameId === gId
+                && evt.winnings.toString(10) === (gameDeposit*2).toString(10);
+        });
     });
 
     it('should not allow alice to reclaim funds', async() => {
@@ -323,18 +330,11 @@ contract(
     });
 
     it('should allow alice reveal move and bob to claim winnings', async() => {
-        let tx = await instance.player1MoveReveal(ROCK, secretAlice, {from: alice});
-        
-        // bob wins game because PAPER beats ROCK
-        truffleAssert.eventEmitted(tx, 'LogGameWinner', evt => {
-            return evt.player === bob
-                && evt.gameId === gId
-                && evt.winnings.toString(10) === (gameDeposit*2).toString(10);
-        });
+        await instance.player1MoveReveal(ROCK, secretAlice, {from: alice});
         
         // bob can withdraw winnings
         const bobBalanceBefore = web3.utils.toBN(await web3.eth.getBalance(bob));
-        tx = await instance.withdraw({from: bob});
+        const tx = await instance.withdraw({from: bob});
         truffleAssert.eventEmitted(tx, 'LogWithdraw', evt => {
             return evt.sender === bob
                 && evt.amount.toString(10) === (gameDeposit*2).toString(10);
@@ -381,6 +381,14 @@ contract(
                 && evt.gameId === gId
                 && evt.gameMove.toString(10) === ROCK.toString(10);
         });
+
+        // game is a draw because ROCK draws with ROCK
+        truffleAssert.eventEmitted(tx, 'LogGameDraw', evt => {
+            return evt.player0 === alice
+                && evt.player1 === bob
+                && evt.gameId === gId
+                && evt.winnings.toString(10) === gameDeposit.toString(10);
+        });
     });
 
     it('should not allow alice to reclaim funds', async() => {
@@ -391,18 +399,10 @@ contract(
     });
 
     it('should allow alice reveal move and then both alice and bob to claim winnings', async() => {
-        let tx = await instance.player1MoveReveal(ROCK, secretAlice, {from: alice});
+        await instance.player1MoveReveal(ROCK, secretAlice, {from: alice});
 
-        // game is a draw because ROCK draws with ROCK
-        truffleAssert.eventEmitted(tx, 'LogGameDraw', evt => {
-            return evt.player0 === alice
-                && evt.player1 === bob
-                && evt.gameId === gId
-                && evt.winnings.toString(10) === gameDeposit.toString(10);
-        });
-        
         // bob can withdraw winnings
-        tx = await instance.withdraw({from: bob});
+        let tx = await instance.withdraw({from: bob});
         truffleAssert.eventEmitted(tx, 'LogWithdraw', evt => {
             return evt.sender === bob
                 && evt.amount.toString(10) === gameDeposit.toString(10);
