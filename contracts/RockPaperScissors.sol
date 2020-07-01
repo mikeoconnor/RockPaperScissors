@@ -353,15 +353,11 @@ contract RockPaperScissors is Stoppable {
             games[_gameId].gameMove2 == GameMoves.None,
             "player2 has made a move"
         );
-        require(games[_gameId].gameDeposit != 0, "no funds");
+        uint256 deposit = games[_gameId].gameDeposit;
+        require(deposit != 0, "no funds");
         require(now > games[_gameId].expiration, "game move not yet expired");
-        balances[games[_gameId].player1] = balances[games[_gameId].player1]
-            .add(games[_gameId].gameDeposit);
-        emit LogPlayer1ReclaimFunds(
-            games[_gameId].player1,
-            _gameId,
-            games[_gameId].gameDeposit
-        );
+        balances[msg.sender] = balances[msg.sender].add(deposit);
+        emit LogPlayer1ReclaimFunds(msg.sender, _gameId, deposit);
 
         //reset game
         games[_gameId].player2 = address(0);
@@ -391,13 +387,9 @@ contract RockPaperScissors is Stoppable {
             now > games[_gameId].expiration,
             "game reveal not yet expired"
         );
-        balances[games[_gameId].player2] = balances[games[_gameId].player2]
-            .add(games[_gameId].gameDeposit.mul(2));
-        emit LogPlayer2ClaimFunds(
-            games[_gameId].player2,
-            _gameId,
-            games[_gameId].gameDeposit.mul(2)
-        );
+        uint256 deposit = games[_gameId].gameDeposit;
+        balances[msg.sender] = balances[msg.sender].add(deposit.mul(2));
+        emit LogPlayer2ClaimFunds(msg.sender, _gameId, deposit.mul(2));
 
         //reset game
         games[_gameId].player2 = address(0);
