@@ -246,14 +246,12 @@ contract RockPaperScissors is Stoppable {
      * commitment.
      * Note: This function also determines the result of the game and
      * redistributes the funds accordingly.
-     * @param _gameId - the game ID.
      * @param _gameMove1 - The game move of player1.
      * @param secret - The secret used to generate the commitment.
      * @return true if successfull, false otherwise.
      * Emits events: LogMoveReveal, LogGameWinner, LogGameDraw
      */
     function player1MoveReveal(
-        bytes32 _gameId,
         GameMoves _gameMove1,
         bytes32 secret
     )
@@ -263,14 +261,10 @@ contract RockPaperScissors is Stoppable {
         moveIsValid(_gameMove1)
         returns (bool success)
     {
-        require(_gameId != 0, "invalid game Id");
+        bytes32 _gameId = generateCommitment(_gameMove1, secret);
         require(games[_gameId].player1 == msg.sender, "incorrect player1");
         GameMoves gameMove2 = games[_gameId].gameMove2;
         require(gameMove2 != GameMoves.None, "player2 has not made a move");
-        require(
-            _gameId == generateCommitment(_gameMove1, secret),
-            "failed to verify commitment"
-        );
         emit LogMoveReveal(msg.sender, _gameId, _gameMove1);
         determineGameResult(_gameId, _gameMove1, gameMove2);
         return true;

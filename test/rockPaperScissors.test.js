@@ -105,7 +105,7 @@ describe('RockPaperScissors - Given game where alice has commited to a move', ()
 
         it('should not allow alice to reveal move', async() => {
             await truffleAssert.reverts(
-                instance.player1MoveReveal(gId, ROCK, secretAlice, {from: alice}),
+                instance.player1MoveReveal(ROCK, secretAlice, {from: alice}),
                 "player2 has not made a move"
             );
         });
@@ -307,7 +307,7 @@ contract(
     });
     
     it('should allow alice to reveal move', async() => {
-        const tx = await instance.player1MoveReveal(gId, ROCK, secretAlice, {from: alice});
+        const tx = await instance.player1MoveReveal(ROCK, secretAlice, {from: alice});
         truffleAssert.eventEmitted(tx, 'LogMoveReveal', evt => {
             return evt.player === alice
                 && evt.gameId === gId
@@ -323,7 +323,7 @@ contract(
     });
 
     it('should allow alice reveal move and bob to claim winnings', async() => {
-        let tx = await instance.player1MoveReveal(gId, ROCK, secretAlice, {from: alice});
+        let tx = await instance.player1MoveReveal(ROCK, secretAlice, {from: alice});
         
         // bob wins game because PAPER beats ROCK
         truffleAssert.eventEmitted(tx, 'LogGameWinner', evt => {
@@ -375,7 +375,7 @@ contract(
     });
     
     it('should allow alice to reveal move', async() => {
-        const tx = await instance.player1MoveReveal(gId, ROCK, secretAlice, {from: alice});
+        const tx = await instance.player1MoveReveal(ROCK, secretAlice, {from: alice});
         truffleAssert.eventEmitted(tx, 'LogMoveReveal', evt => {
             return evt.player === alice
                 && evt.gameId === gId
@@ -391,7 +391,7 @@ contract(
     });
 
     it('should allow alice reveal move and then both alice and bob to claim winnings', async() => {
-        let tx = await instance.player1MoveReveal(gId, ROCK, secretAlice, {from: alice});
+        let tx = await instance.player1MoveReveal(ROCK, secretAlice, {from: alice});
 
         // game is a draw because ROCK draws with ROCK
         truffleAssert.eventEmitted(tx, 'LogGameDraw', evt => {
@@ -461,7 +461,7 @@ contract(
     });
 
     it('should allow alice to reveal move and win game1', async() => {
-        const tx = await instance.player1MoveReveal(gId1, PAPER, secretAlice, {from: alice});
+        const tx = await instance.player1MoveReveal(PAPER, secretAlice, {from: alice});
         truffleAssert.eventEmitted(tx, 'LogMoveReveal', evt => {
             return evt.player === alice
                 && evt.gameId === gId1
@@ -484,7 +484,7 @@ contract(
     });
 
     it('should then allow alice to reveal move and win game2', async() => {
-        const tx = await instance.player1MoveReveal(gId2, PAPER, secretAlice2, {from: alice});
+        const tx = await instance.player1MoveReveal(PAPER, secretAlice2, {from: alice});
         truffleAssert.eventEmitted(tx, 'LogMoveReveal', evt => {
             return evt.player === alice
                 && evt.gameId === gId2
