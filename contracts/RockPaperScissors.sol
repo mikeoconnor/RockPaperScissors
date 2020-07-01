@@ -292,36 +292,19 @@ contract RockPaperScissors is Stoppable {
         uint256 deposit = games[_gameId].gameDeposit;
         if (idx == 0) {
             // player1 wins the game
-            emit LogGameWinner(
-                msg.sender,
-                _gameId,
-                deposit.mul(2)
-            );
-            balances[msg.sender] = balances[msg.sender]
-                .add(deposit.mul(2));
+            emit LogGameWinner(msg.sender, _gameId, deposit.mul(2));
+            balances[msg.sender] = balances[msg.sender].add(deposit.mul(2));
         } else if (idx == 1) {
             // player2 wins the game
             address player2 = games[_gameId].player2;
-            emit LogGameWinner(
-                player2,
-                _gameId,
-                deposit.mul(2)
-            );
-            balances[player2] = balances[player2]
-                .add(deposit.mul(2));
+            emit LogGameWinner(player2, _gameId, deposit.mul(2));
+            balances[player2] = balances[player2].add(deposit.mul(2));
         } else if (idx == 2) {
             // player1 and player2 draw the game
             address player2 = games[_gameId].player2;
-            emit LogGameDraw(
-                msg.sender,
-                player2,
-                _gameId,
-                deposit
-            );
-            balances[msg.sender] = balances[msg.sender]
-                .add(deposit);
-            balances[player2] = balances[player2]
-                .add(deposit);
+            emit LogGameDraw(msg.sender, player2, _gameId, deposit);
+            balances[msg.sender] = balances[msg.sender].add(deposit);
+            balances[player2] = balances[player2].add(deposit);
         } else {
             require(false, "unexpected winner index");
         }
