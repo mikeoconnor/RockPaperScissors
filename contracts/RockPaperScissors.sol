@@ -163,18 +163,19 @@ contract RockPaperScissors is Stoppable {
 
     /**
      * @dev Generate a commitment (crytographic hash of game move).
+     * @param player - the address of player generating the commitment.
      * @param _gameMove - the game move.
      * @param secret - secert phrase that is unique to each player and only
      * known by each player.
      * @return A commitment.
      */
-    function generateCommitment(GameMoves _gameMove, bytes32 secret)
+    function generateCommitment(address player, GameMoves _gameMove, bytes32 secret)
         public
         view
         moveIsValid(_gameMove)
         returns (bytes32 result)
     {
-        result = keccak256(abi.encode(address(this), _gameMove, secret));
+        result = keccak256(abi.encode(address(this), player, _gameMove, secret));
     }
 
     /**
@@ -261,7 +262,7 @@ contract RockPaperScissors is Stoppable {
         moveIsValid(_gameMove1)
         returns (bool success)
     {
-        bytes32 _gameId = generateCommitment(_gameMove1, secret);
+        bytes32 _gameId = generateCommitment(msg.sender, _gameMove1, secret);
         require(games[_gameId].player1 == msg.sender, "incorrect player1");
         GameMoves gameMove2 = games[_gameId].gameMove2;
         require(gameMove2 != GameMoves.None, "player2 has not made a move");
