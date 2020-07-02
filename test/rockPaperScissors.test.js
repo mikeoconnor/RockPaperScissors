@@ -402,15 +402,15 @@ contract(
         await instance.player1MoveReveal(ROCK, secretAlice, {from: alice});
 
         // bob can withdraw winnings
-        let tx = await instance.withdraw({from: bob});
+        const tx = await instance.withdraw({from: bob});
         truffleAssert.eventEmitted(tx, 'LogWithdraw', evt => {
             return evt.sender === bob
                 && evt.amount.toString(10) === gameDeposit.toString(10);
         });
         
         // alice can withdraw winnings
-        tx = await instance.withdraw({from: alice});
-        truffleAssert.eventEmitted(tx, 'LogWithdraw', evt => {
+        const tx2 = await instance.withdraw({from: alice});
+        truffleAssert.eventEmitted(tx2, 'LogWithdraw', evt => {
             return evt.sender === alice
                 && evt.amount.toString(10) === gameDeposit.toString(10);
         });
