@@ -288,7 +288,7 @@ contract RockPaperScissors is Stoppable {
         moveIsValid(_gameMove1)
         moveIsValid(_gameMove2)
     {
-        uint8 idx = gameWinner(_gameMove1, _gameMove2);
+        uint256 idx = (uint256(_gameMove1).add(2)).sub(uint256(_gameMove2)) % 3;
         uint256 deposit = games[_gameId].gameDeposit;
         if (idx == 0) {
             // player1 wins the game
@@ -314,23 +314,6 @@ contract RockPaperScissors is Stoppable {
         games[_gameId].gameMove2 = GameMoves(0);
         games[_gameId].gameDeposit = 0;
         games[_gameId].expiration = 0;
-    }
-
-    /**
-     * @dev Given the moves made by each player determine the result of the game.
-     * @param gameMove0 - the game move of first player(index 0).
-     * @param gameMove1 - the game move of second player(index 1).
-     * @return The index of the winning player (0 or 1) if there was a winner,
-     * otherwise return 2 if game was drawn.
-     */
-    function gameWinner(GameMoves gameMove0, GameMoves gameMove1)
-        internal
-        pure
-        moveIsValid(gameMove0)
-        moveIsValid(gameMove1)
-        returns (uint8 index)
-    {
-        index = uint8((uint(gameMove0).add(2)).sub(uint(gameMove1)) % 3);
     }
 
     /**
