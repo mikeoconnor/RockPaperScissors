@@ -362,21 +362,22 @@ contract RockPaperScissors is Stoppable {
         ifRunning
         returns (bool success)
     {
-        require(games[_gameId].player2 == msg.sender, "incorrect player");
         require(games[_gameId].gameMove2 != GameMoves.None, "player2 has not made a move");
         require(
             now > games[_gameId].expiration,
             "game reveal not yet expired"
         );
         uint256 deposit = games[_gameId].gameDeposit;
-        balances[msg.sender] = balances[msg.sender].add(deposit.mul(2));
-        emit LogPlayer2ClaimFunds(msg.sender, _gameId, deposit.mul(2));
+        address player2 = games[_gameId].player2;
+        balances[player2] = balances[player2].add(deposit.mul(2));
 
         //reset game
         games[_gameId].player2 = address(0);
         games[_gameId].gameMove2 = GameMoves(0);
         games[_gameId].gameDeposit = 0;
         games[_gameId].expiration = 0;
+
+        emit LogPlayer2ClaimFunds(player2, _gameId, deposit.mul(2));
         return true;
     }
 

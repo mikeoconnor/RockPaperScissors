@@ -429,7 +429,7 @@ contract(
         // bob should not be allowed to claim funds
         await truffleAssert.reverts(
             instance.player2ClaimFunds(gId, {from: bob}),
-            "incorrect player"
+            "player2 has not made a move"
         );
     });
 });
