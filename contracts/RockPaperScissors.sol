@@ -196,7 +196,6 @@ contract RockPaperScissors is Stoppable {
         ifRunning
         returns (bool success)
     {
-        require(_commitment != 0, "commitment should be non zero");
         require(games[_commitment].player1 == address(0), "game id already used");
         require(msg.value != 0, "a game deposit is required");
         require(_player2 != msg.sender, "both players cannot be the same");
@@ -225,7 +224,6 @@ contract RockPaperScissors is Stoppable {
         moveIsValid(_gameMove)
         returns (bool success)
     {
-        require(_gameId != 0, "invalid game Id");
         require(games[_gameId].player2 == msg.sender, "incorrect player");
         require(
             msg.value == games[_gameId].gameDeposit,
@@ -331,7 +329,6 @@ contract RockPaperScissors is Stoppable {
         ifRunning
         returns (bool success)
     {
-        require(_gameId != 0, "invalid game Id");
         require(games[_gameId].player1 == msg.sender, "incorrect player");
         require(
             games[_gameId].gameMove2 == GameMoves.None,
@@ -364,7 +361,6 @@ contract RockPaperScissors is Stoppable {
         ifRunning
         returns (bool success)
     {
-        require(_gameId != 0, "invalid game Id");
         require(games[_gameId].player2 == msg.sender, "incorrect player");
         require(games[_gameId].gameMove2 != GameMoves.None, "player2 has not made a move");
         require(
